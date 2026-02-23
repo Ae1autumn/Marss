@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>{{ article.title }} - {{ blog.name }}</title>
+   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+   <link rel="icon" href="{{ blog.favicon }}">
+   <style>
+      /* ==================== 基础样式 ==================== */
+      *, *::before, *::after {
+         box-sizing: border-box;
+      }
+
+      * {
+         margin: 0;
+         padding: 0;
+      }
+
+      body {
+         background-color: #0d0d0d;
+         color: #fff;
+         font-family: Arial, sans-serif;
+         line-height: 1.6;
+         padding: 20px;
+         max-width: 1000px;
+         margin: 0 auto;
+         position: relative;
+         min-height: 200vh;
+         transition: background-color 0.5s ease, color 0.5s ease;
+         overflow-x: hidden;
+      }
+
+      /* ==================== 主题样式 ==================== */
+      body.dark-mode {
+         background-color: #121212;
+         color: #ffffff;
+      }
+      
+      body.light-mode {
+         background-color: #fff;
+         color: #000;
+      }
+      
+      body.dark-mode .header { border-bottom-color: #333; }
+      body.dark-mode .title { color: #fff; }
+      body.dark-mode .summary { color: #ccc; }
+      body.dark-mode .date { color: #999; }
+      body.dark-mode .tag { background-color: #333; color: #fff; }
+      body.dark-mode h1, body.dark-mode h2, body.dark-mode h3,
+      body.dark-mode h4, body.dark-mode h5, body.dark-mode h6 {
+         border-bottom-color: #333;
+         color: #fff;
+      }
+      body.dark-mode .comments { border-top-color: #333; }
+
+      body.light-mode .header { border-bottom-color: #ddd; }
+      body.light-mode .title { color: #000; }
+      body.light-mode .summary { color: #666; }
+      body.light-mode .date { color: #777; }
+      body.light-mode .tag { background-color: #eee; color: #000; }
+      body.light-mode h1, body.light-mode h2, body.light-mode h3,
+      body.light-mode h4, body.light-mode h5, body.light-mode h6 {
+         border-bottom-color: #ddd;
+         color: #000;
+      }
+      body.light-mode .comments { border-top-color: #ddd; }
+
+      /* ==================== 文章内容样式 ==================== */
+      .header {
+         margin-bottom: 9px;
+         padding: 20px;
+         padding-bottom: 3px;
+         border-bottom: 1px solid #333;
+         transition: border-color 0.5s ease;
+         word-wrap: break-word;
+         word-break: break-word;
+         overflow-wrap: break-word;
+      }
+
+      .title {
+         font-size: 2.5rem;
+         margin-bottom: 3px;
+         color: #fff;
+         transition: color 0.5s ease;
+         word-wrap: break-word;
+         word-break: break-word;
+         overflow-wrap: break-word;
+      }
+
+      .summary {
+         font-size: 1.1rem;
+         margin-bottom: 3px;
+         color: #ccc;
+         transition: color 0.5s ease;
+         word-wrap: break-word;
+         word-break: break-word;
+         overflow-wrap: break-word;
+      }
+
+      .date {
+         color: #999;
+         font-size: 0.9rem;
+         margin-bottom: 3px;
+         transition: color 0.5s ease;
+      }
+
+      .tags {
+         display: flex;
+         flex-wrap: wrap;
+         gap: 10px;
+         margin-bottom: 3px;
+      }
+
+      .tag {
+         background-color: #333;
+         color: #fff;
+         padding: 2px 10px;
+         border-radius: 3px;
+         font-size: 0.9rem;
+         transition: background-color 0.5s ease, color 0.5s ease;
+      }
+
+      .content {
+         padding: 20px;
+         padding-top: 0px;
+         margin-bottom: 50px;
+         transition: color 0.5s ease;
+         overflow-x: hidden;
+         word-wrap: break-word;
+         word-break: break-word;
+         overflow-wrap: break-word;
+      }
+
+      /* ==================== Markdown内容样式 ==================== */
+      .content p {
+         margin-top: 0;
+         margin-bottom: 0.3em;
+         line-height: 1.5;
+         word-wrap: break-word;
+         word-break: break-word;
+         overflow-wrap: break-word;
+      }
+
+      .content h1, .content h2, .content h3,
+      .content h4, .content h5, .content h6 {
+         margin: 1.5em 0 0.5em;
+         padding-bottom: 10px;
+         border-bottom: 1px solid #333;
+         transition: border-color 0.5s ease, color 0.5s ease;
+         word-wrap: break-word;
+         word-break: break-word;
+         overflow-wrap: break-word;
+      }
+
+      .content ul, .content ol {
+         margin: 0.8em 0;
+         padding-left: 2em;
+      }
+
+      .content li {
+         margin: 0.3em 0;
+         line-height: 1.6;
+         word-wrap: break-word;
+         word-break: break-word;
+         overflow-wrap: break-word;
+      }
+
+      .content pre {
+         margin: 1em 0;
+         padding: 1em;
+         background-color: #f5f5f5;
+         border-radius: 4px;
+         overflow-x: auto;
+         white-space: pre;
+         max-width: 100%;
+      }
+
+      body.dark-mode .content pre { background-color: #2d2d2d; color: #f8f8f2; }
+
+      .content code {
+         font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+         font-size: 0.9em;
+      }
+
+      .content p code {
+         background-color: #f5f5f5;
+         padding: 0.2em 0.4em;
+         border-radius: 3px;
+         word-wrap: break-word;
+         word-break: break-word;
+         overflow-wrap: break-word;
+      }
+
+      body.dark-mode .content p code { background-color: #3a3a3a; color: #f8f8f2; }
+
+      .content blockquote {
+         margin: 1em 0;
+         padding: 0.5em 1em;
+         border-left: 4px solid #ddd;
+         background-color: #f9f9f9;
+         color: #666;
+         border-radius: 5px;
+         word-wrap: break-word;
+         word-break: break-word;
+         overflow-wrap: break-word;
+      }
+
+      body.dark-mode .content blockquote { border-left-color: #555; background-color: #2a2a2a; color: #ccc; }
+
+      .table-wrapper { overflow-x: auto; margin: 20px 0; max-width: 100%; }
+
+      .content table {
+         margin: 1em 0;
+         border-collapse: collapse;
+         width: 100%;
+         max-width: 100%;
+      }
+
+      .content th, .content td {
+         border: 1px solid #ddd;
+         padding: 0.5em 1em;
+         text-align: left;
+         word-wrap: break-word;
+         word-break: break-word;
+         overflow-wrap: break-word;
+         max-width: 300px;
+      }
+
+      .content th { background-color: #f5f5f5; font-weight: 600; }
+      body.dark-mode .content th { background-color: #333; border-color: #444; }
+      body.dark-mode .content td { border-color: #444; }
+
+      .content img { max-width: 100%; height: auto; margin: 1em 0; border-radius: 4px; display: block; }
+      .content hr { margin: 2em 0; border: none; border-top: 1px solid #ddd; }
+
+      .content a {
+         color: #4da6ff;
+         text-decoration: none;
+         border-bottom: 1px dotted rgba(77, 166, 255, 0.5);
+         transition: all 0.3s ease;
+         word-wrap: break-word;
+         word-break: break-word;
+         overflow-wrap: break-word;
+      }
+
+      body.dark-mode .content a { color: #6bb8ff; border-bottom: 1px dotted rgba(107, 184, 255, 0.5); }
+
+      .content a:hover {
+         color: #fff;
+         border-bottom: 1px solid rgba(77, 166, 255, 0.8);
+         background-color: rgba(77, 166, 255, 0.1);
+      }
+
+      body.dark-mode .content a:hover {
+         color: #fff;
+         border-bottom: 1px solid rgba(107, 184, 255, 0.8);
+         background-color: rgba(107, 184, 255, 0.1);
+      }
+
+      /* ==================== 评论区 ==================== */
+      .comments {
+         margin-top: 50px;
+         padding: 20px;
+         border-top: 1px solid #333;
+         transition: border-color 0.5s ease;
+      }
+
+      /* ==================== 亚克力浮动按钮 ==================== */
+      .floating-btn {
+         position: fixed;
+         bottom: 30px;
+         right: 30px;
+         width: 60px;
+         height: 60px;
+         border-radius: 50%;
+         display: flex;
+         justify-content: center;
+         align-items: center;
+         cursor: pointer;
+         font-size: 24px;
+         z-index: 1000;
+         border: 1px solid rgba(255, 255, 255, 0.12);
+         outline: none;
+         /* 亚克力：模糊背景 + 半透明 */
+         background: rgba(20, 20, 20, 0.55);
+         backdrop-filter: blur(20px) saturate(180%);
+         -webkit-backdrop-filter: blur(20px) saturate(180%);
+         transition: background 0.3s ease, border-color 0.3s ease;
+      }
+
+      body.light-mode .floating-btn {
+         background: rgba(255, 255, 255, 0.55);
+         border-color: rgba(0, 0, 0, 0.1);
+         color: #000;
+      }
+
+      /* ==================== 遮罩 ==================== */
+      .menu-mask {
+         position: fixed;
+         top: 0;
+         left: 0;
+         width: 100%;
+         height: 100%;
+         background-color: rgba(0, 0, 0, 0.3);
+         backdrop-filter: blur(2px);
+         -webkit-backdrop-filter: blur(2px);
+         z-index: 998;
+         display: none;
+         transition: opacity 0.3s ease;
+      }
+      .menu-mask.active { display: block; }
+
+      /* ==================== 亚克力侧边菜单 wrapper ==================== */
+      /* wrapper 负责 fixed 定位 + Reveal 发光边框，不受 overflow:hidden 限制 */
+      .side-menu-wrapper {
+         position: fixed;
+         bottom: 30px;
+         right: 30px;
+         width: 250px;
+         height: 400px;
+         max-width: calc(100vw - 60px);
+         border-radius: 12px;
+         z-index: 999;
+         display: none;
+         /* pointer-events: none 让点击穿透到 side-menu */
+         pointer-events: none;
+      }
+
+      .side-menu-wrapper.active {
+         display: block;
+         animation: menuAppear 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+      }
+
+      @keyframes menuAppear {
+         0%   { transform: scale(0.1); opacity: 0; }
+         100% { transform: scale(1);   opacity: 1; }
+      }
+
+      /* Reveal 边框层挂在 wrapper 上，四边完整 */
+      .side-menu-wrapper::before {
+         content: '';
+         position: absolute;
+         inset: -1px;
+         border-radius: inherit;
+         padding: 1px;
+         background: radial-gradient(
+            150px circle at var(--rx, -9999px) var(--ry, -9999px),
+            rgba(180, 205, 255, 0.95),
+            rgba(108, 143, 255, 0.45) 45%,
+            transparent 70%
+         );
+         -webkit-mask:
+            linear-gradient(#fff 0 0) content-box,
+            linear-gradient(#fff 0 0);
+         -webkit-mask-composite: xor;
+         mask-composite: exclude;
+         pointer-events: none;
+         z-index: 1;
+      }
+
+      /* ==================== 亚克力侧边菜单 ==================== */
+      .side-menu {
+         /* 不再 fixed，由 wrapper 控制位置 */
+         position: relative;
+         width: 100%;
+         height: 100%;
+         border-radius: 12px;
+         display: none;
+         flex-direction: row;
+         overflow: hidden;
+         /* 亚克力 */
+         background: rgba(18, 18, 18, 0.6);
+         backdrop-filter: blur(24px) saturate(180%);
+         -webkit-backdrop-filter: blur(24px) saturate(180%);
+         border: 1px solid rgba(255, 255, 255, 0.1);
+         /* 恢复点击事件 */
+         pointer-events: auto;
+         transition: background 0.5s ease, border-color 0.5s ease;
+      }
+
+      body.light-mode .side-menu {
+         background: rgba(255, 255, 255, 0.6);
+         border-color: rgba(0, 0, 0, 0.08);
+      }
+
+      .side-menu.active {
+         display: flex;
+      }
+
+      /* ==================== 菜单左侧：章节列表 ==================== */
+      .menu-left {
+         position: relative;
+         width: 200px;
+         padding: 20px;
+         overflow-y: auto;
+         scrollbar-width: none;
+         /* 亚克力底色透明，让父级模糊透过 */
+         background: transparent;
+         word-wrap: break-word;
+         word-break: break-word;
+         overflow-wrap: break-word;
+      }
+
+      .menu-left::-webkit-scrollbar { display: none; }
+
+      /* menu-left 的 Reveal 发光 */
+      /* 半径缩小到 60px：只照亮鼠标附近的边框，不穿透相邻 item 间隙 */
+      /* ::before 挂在自身上，不受 overflow-y:auto 裁剪，外侧边也能触发 */
+      .menu-left::before {
+         content: '';
+         position: absolute;
+         inset: -1px;
+         border-radius: 12px 0 0 12px;
+         padding: 1px;
+         background: radial-gradient(
+            60px circle at var(--rx, -9999px) var(--ry, -9999px),
+            rgba(180, 205, 255, 0.9),
+            rgba(108, 143, 255, 0.4) 45%,
+            transparent 70%
+         );
+         -webkit-mask:
+            linear-gradient(#fff 0 0) content-box,
+            linear-gradient(#fff 0 0);
+         -webkit-mask-composite: xor;
+         mask-composite: exclude;
+         pointer-events: none;
+         z-index: 2;
+      }
+
+      .chapter-item {
+         padding: 10px 0;
+         border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+         cursor: pointer;
+         color: rgba(255, 255, 255, 0.7);
+         transition: color 0.2s, padding-left 0.2s;
+         word-wrap: break-word;
+         word-break: break-word;
+         overflow-wrap: break-word;
+      }
+
+      body.light-mode .chapter-item {
+         border-bottom-color: rgba(0, 0, 0, 0.08);
+         color: rgba(0, 0, 0, 0.7);
+      }
+
+      .chapter-item.h1-item { padding-left: 0; }
+      .chapter-item.h2-item { padding-left: 14px; color: rgba(255,255,255,0.45); font-size: 0.9em; }
+      .chapter-item.h3-item { padding-left: 28px; color: rgba(255,255,255,0.3);  font-size: 0.85em; }
+
+      body.light-mode .chapter-item.h2-item { color: rgba(0,0,0,0.45); }
+      body.light-mode .chapter-item.h3-item { color: rgba(0,0,0,0.3); }
+
+      /* 红色 hover 保留 */
+      .chapter-item:hover { color: #f00; }
+      .chapter-item.h1-item:hover { padding-left: 5px; }
+      .chapter-item.h2-item:hover { padding-left: 19px; }
+      .chapter-item.h3-item:hover { padding-left: 33px; }
+      .chapter-item.current { color: red !important; }
+
+      /* ==================== 菜单右侧：按钮区 ==================== */
+      .menu-right {
+         position: relative;
+         width: 50px;
+         height: 100%;
+         display: flex;
+         flex-direction: column;
+         /* 亚克力分隔感：稍深一点的半透明 */
+         background: rgba(0, 0, 0, 0.2);
+         border-left: 1px solid rgba(255, 255, 255, 0.07);
+         transition: background 0.5s ease;
+      }
+
+      body.light-mode .menu-right {
+         background: rgba(0, 0, 0, 0.05);
+         border-left-color: rgba(0, 0, 0, 0.06);
+      }
+
+      /* menu-right 的 Reveal 发光 */
+      .menu-right::before {
+         content: '';
+         position: absolute;
+         inset: -1px;
+         border-radius: 0 12px 12px 0;
+         padding: 1px;
+         background: radial-gradient(
+            130px circle at var(--rx, -9999px) var(--ry, -9999px),
+            rgba(180, 205, 255, 0.7),
+            rgba(108, 143, 255, 0.3) 45%,
+            transparent 70%
+         );
+         -webkit-mask:
+            linear-gradient(#fff 0 0) content-box,
+            linear-gradient(#fff 0 0);
+         -webkit-mask-composite: xor;
+         mask-composite: exclude;
+         pointer-events: none;
+         z-index: 2;
+      }
+
+      .menu-buttons {
+         flex: 1;
+         display: flex;
+         flex-direction: column;
+         justify-content: space-between;
+         align-items: center;
+         padding: 20px 0;
+         width: 100%;
+         margin-left: 1px;
+      }
+
+      /* 红色按钮保留 */
+      .menu-btn {
+         color: rgba(255, 255, 255, 0.75);
+         background: none;
+         border: none;
+         cursor: pointer;
+         transition: all 0.2s;
+         font-size: 20px;
+         width: 47px;
+         height: 47px;
+         text-align: center;
+         border-radius: 5px;
+         display: flex;
+         justify-content: center;
+         align-items: center;
+      }
+
+      body.light-mode .menu-btn { color: rgba(0, 0, 0, 0.6); }
+      .menu-btn:hover { color: #f00; background-color: rgba(255, 0, 0, 0.1); }
+
+      .close-btn {
+         height: 50px;
+         background: rgba(0, 0, 0, 0.15);
+         color: rgba(255, 255, 255, 0.6);
+         border: none;
+         border-top: 1px solid rgba(255, 255, 255, 0.07);
+         cursor: pointer;
+         font-size: 16px;
+         transition: background 0.2s, color 0.2s;
+         width: 100%;
+         margin-left: 1px;
+      }
+
+      body.light-mode .close-btn {
+         background: rgba(0, 0, 0, 0.04);
+         color: rgba(0, 0, 0, 0.5);
+         border-top-color: rgba(0, 0, 0, 0.06);
+      }
+
+      .close-btn:hover { color: #f00; background-color: rgba(255, 0, 0, 0.08); }
+
+      /* ==================== Reveal：floating-btn ==================== */
+      .floating-btn::before {
+         content: '';
+         position: absolute;
+         inset: -1px;
+         border-radius: 50%;
+         padding: 1px;
+         background: radial-gradient(
+            80px circle at var(--rx, -9999px) var(--ry, -9999px),
+            rgba(180, 205, 255, 0.95),
+            rgba(108, 143, 255, 0.45) 45%,
+            transparent 70%
+         );
+         -webkit-mask:
+            linear-gradient(#fff 0 0) content-box,
+            linear-gradient(#fff 0 0);
+         -webkit-mask-composite: xor;
+         mask-composite: exclude;
+         pointer-events: none;
+      }
+
+      .header, .floating-btn, .side-menu, .comments {
+         user-select: none;
+         -webkit-user-select: none;
+         -webkit-touch-callout: none;
+      }
+      
+   </style>
+</head>
+
+<body class="{% if blog.theme.mode == 'light' %}light-mode{% else %}dark-mode{% endif %}">
+   <div class="header">
+      <h1 class="title">{{ article.title | default('') }}</h1>
+      <p class="summary">{{ article.summary }}</p>
+      <div class="date">{{ article.date }}</div>
+      <div class="tags">
+         {% for tag in article.tags %}
+         <span class="tag">{{ tag }}</span>
+         {% endfor %}
+      </div>
+   </div>
+
+   <div class="content">
+      {{ article.content | safe | default('') }}
+   </div>
+
+   <div class="comments"></div>
+
+   <button class="floating-btn" id="menuToggle" style="color: #fff">☰</button>
+
+   <div class="menu-mask" id="menuMask"></div>
+
+   <!-- wrapper 负责 fixed 定位和 Reveal 外框，side-menu 负责内容和亚克力 -->
+   <div class="side-menu-wrapper" id="sideMenuWrapper">
+      <div class="side-menu" id="sideMenu">
+         <div class="menu-left" id="chapterList"></div>
+         <div class="menu-right">
+            <div class="menu-buttons">
+               <button class="menu-btn" id="toBottomBtn">▼</button>
+               <button class="menu-btn" id="middleBtn">◎</button>
+               <button class="menu-btn" id="toTopBtn">▲</button>
+            </div>
+            <button class="close-btn" id="closeBtn">╳</button>
+         </div>
+      </div>
+   </div>
+
+   <script>
+     const menuToggle     = document.getElementById('menuToggle');
+     const sideMenuWrapper= document.getElementById('sideMenuWrapper');
+     const sideMenu       = document.getElementById('sideMenu');
+     const menuMask       = document.getElementById('menuMask');
+     const closeBtn       = document.getElementById('closeBtn');
+     const toBottomBtn    = document.getElementById('toBottomBtn');
+     const middleBtn      = document.getElementById('middleBtn');
+     const toTopBtn       = document.getElementById('toTopBtn');
+     const chapterList    = document.getElementById('chapterList');
+     const menuLeftEl     = document.querySelector('.menu-left');
+     const menuRightEl    = document.querySelector('.menu-right');
+
+     // === 1. 收集 h1/h2/h3，生成唯一 ID ===
+     const allHeadings = Array.from(
+       document.querySelectorAll('.content h1, .content h2, .content h3')
+     ).filter(h => h.textContent.trim() !== '');
+
+     allHeadings.forEach((el, index) => {
+       el.id = `heading-${index}`;
+     });
+
+     // === 2. 应用主题 ===
+     function applyTheme() {
+       const savedTheme  = localStorage.getItem('theme');
+       const configTheme = "{{ blog.theme.mode }}";
+       const mode = savedTheme || configTheme;
+       document.body.classList.toggle('light-mode', mode === 'light');
+       document.body.classList.toggle('dark-mode',  mode !== 'light');
+     }
+     applyTheme();
+
+     // === 3. 生成章节导航 ===
+     allHeadings.forEach(heading => {
+       const listItem  = document.createElement('div');
+       const level     = parseInt(heading.tagName.substring(1));
+       const classMap  = { 1: 'h1-item', 2: 'h2-item', 3: 'h3-item' };
+       listItem.className   = `chapter-item ${classMap[level] || 'h1-item'}`;
+       listItem.textContent = heading.textContent;
+       listItem.dataset.id  = heading.id;
+
+       listItem.addEventListener('click', (e) => {
+         e.stopPropagation();
+         heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+         closeMenu();
+       });
+
+       chapterList.appendChild(listItem);
+     });
+
+     // === 4. 高亮 & 进度追踪 ===
+     let currentId = null;
+
+     function setActiveItem(id) {
+       document.querySelectorAll('.chapter-item.current').forEach(i => i.classList.remove('current'));
+       const item = document.querySelector(`.chapter-item[data-id="${id}"]`);
+       if (item) item.classList.add('current');
+     }
+
+     function scrollMenuToItem(id) {
+       const item = document.querySelector(`.chapter-item[data-id="${id}"]`);
+       if (!item) return;
+       const container       = chapterList;
+       const itemTop         = item.offsetTop;
+       const itemHeight      = item.offsetHeight;
+       const containerHeight = container.clientHeight;
+       const scrollTarget    = itemTop - (containerHeight - itemHeight) / 2;
+       if (container.scrollHeight > containerHeight) {
+         container.scrollTo({ top: Math.max(0, scrollTarget), behavior: 'smooth' });
+       }
+     }
+
+     function updateActiveHeading() {
+       if (allHeadings.length === 0) return;
+       const scrollY = window.scrollY;
+       const offset  = 80;
+       let current   = allHeadings[0];
+
+       for (let i = 0; i < allHeadings.length; i++) {
+         const top = allHeadings[i].getBoundingClientRect().top + scrollY;
+         if (top <= scrollY + offset) current = allHeadings[i];
+         else break;
+       }
+
+       if (current.id !== currentId) {
+         currentId = current.id;
+         setActiveItem(currentId);
+         scrollMenuToItem(currentId);
+       }
+     }
+
+     if (allHeadings.length > 0) {
+       currentId = allHeadings[0].id;
+       setActiveItem(currentId);
+     }
+
+     window.addEventListener('scroll', updateActiveHeading, { passive: true });
+
+     // === 5. 菜单控制 ===
+     function openMenu() {
+       sideMenuWrapper.classList.add('active');
+       sideMenu.classList.add('active');
+       menuMask.classList.add('active');
+       menuToggle.style.display = 'none';
+       if (currentId) scrollMenuToItem(currentId);
+     }
+
+     function closeMenu() {
+       sideMenuWrapper.classList.remove('active');
+       sideMenu.classList.remove('active');
+       menuMask.classList.remove('active');
+       menuToggle.style.display = 'flex';
+     }
+
+     menuToggle.addEventListener('click',  (e) => { e.stopPropagation(); openMenu(); });
+     closeBtn.addEventListener('click',    (e) => { e.stopPropagation(); closeMenu(); });
+     menuMask.addEventListener('click',    (e) => { e.stopPropagation(); closeMenu(); });
+     sideMenu.addEventListener('click',    (e) => e.stopPropagation());
+
+     toBottomBtn.addEventListener('click', (e) => {
+       e.stopPropagation();
+       window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+       closeMenu();
+     });
+
+     middleBtn.addEventListener('click', (e) => {
+       e.stopPropagation();
+       const middle = (document.documentElement.scrollHeight - window.innerHeight) / 2;
+       window.scrollTo({ top: middle, behavior: 'smooth' });
+       closeMenu();
+     });
+
+     toTopBtn.addEventListener('click', (e) => {
+       e.stopPropagation();
+       window.scrollTo({ top: 0, behavior: 'smooth' });
+       closeMenu();
+     });
+
+     // === 6. 滚动进度指示器 ===
+     function updateProgress() {
+       const scrollHeight   = document.documentElement.scrollHeight - window.innerHeight;
+       const scrollPosition = window.scrollY;
+       const scrollPercent  = scrollHeight > 0 ? Math.min(scrollPosition / scrollHeight, 1) : 0;
+       const redValue       = Math.floor(scrollPercent * 255);
+       menuToggle.style.backgroundColor = `rgba(${redValue}, 0, 0, 0.55)`;
+       menuToggle.style.boxShadow       = `0 4px 12px rgba(${redValue}, 0, 0, 0.3)`;
+     }
+
+     window.addEventListener('scroll', updateProgress, { passive: true });
+     window.addEventListener('resize', updateProgress, { passive: true });
+     updateProgress();
+
+     // ==================== Reveal Highlight ====================
+     // 统一用 document mousemove，在元素外一定范围内也能触发
+
+     const revealTargets = [
+       { el: menuToggle,       range: 60,  alwaysOn: true  },
+       { el: sideMenuWrapper,  range: 80,  alwaysOn: false },
+       { el: menuLeftEl,       range: 80,  alwaysOn: false },
+       { el: menuRightEl,      range: 80,  alwaysOn: false },
+     ];
+
+     function clearAllReveal() {
+       revealTargets.forEach(({ el }) => {
+         el?.style.setProperty('--rx', '-9999px');
+         el?.style.setProperty('--ry', '-9999px');
+       });
+     }
+
+     function handleMove(e) {
+       // 只处理鼠标，忽略触摸和触控笔
+       if (e.pointerType && e.pointerType !== 'mouse') return;
+
+       revealTargets.forEach(({ el, range, alwaysOn }) => {
+         if (!el) return;
+
+         // 菜单隐藏时，内层元素跳过
+         if (!alwaysOn && !sideMenuWrapper.classList.contains('active')) {
+           el.style.setProperty('--rx', '-9999px');
+           el.style.setProperty('--ry', '-9999px');
+           return;
+         }
+
+         const r    = el.getBoundingClientRect();
+         const dx   = Math.max(r.left - e.clientX, 0, e.clientX - r.right);
+         const dy   = Math.max(r.top  - e.clientY, 0, e.clientY - r.bottom);
+         const dist = Math.sqrt(dx * dx + dy * dy);
+
+         if (dist <= range) {
+           el.style.setProperty('--rx', (e.clientX - r.left) + 'px');
+           el.style.setProperty('--ry', (e.clientY - r.top)  + 'px');
+         } else {
+           el.style.setProperty('--rx', '-9999px');
+           el.style.setProperty('--ry', '-9999px');
+         }
+       });
+     }
+
+     // pointermove：安卓 OTG 鼠标不按键也能持续触发
+     // mousemove：桌面浏览器兜底
+     document.addEventListener('pointermove', handleMove);
+     document.addEventListener('mousemove',   handleMove);
+
+     // 松开左键时重新计算一次（避免松手后残留）
+     document.addEventListener('pointerup',  handleMove);
+     document.addEventListener('mouseup',    handleMove);
+
+     // 鼠标离开窗口 / 窗口失焦 / pointer 离开时全部熄灭
+     document.addEventListener('pointerleave', clearAllReveal);
+     document.addEventListener('mouseleave',   clearAllReveal);
+     window.addEventListener('blur',           clearAllReveal);
+
+   </script>
+
+</body>
+
+</html>
