@@ -476,11 +476,11 @@
          left: 8px;
          right: 8px;
          height: 1px;
-         background: rgba(255, 255, 255, 0.15);
+         background: rgba(255, 255, 255, 0.3);
       }
 
       body.light-mode .chapter-item::after {
-         background: rgba(0, 0, 0, 0.12);
+         background: rgba(0, 0, 0, 0.3);
       }
 
       /* 最后一个 item 不要分割线 */
@@ -801,6 +801,24 @@
      }
 
      window.addEventListener('scroll', updateActiveHeading, { passive: true });
+
+     // 移动端长按松手后清除 hover 残留
+     // 注意：要在 hoveredItem 和 refreshHighlight 定义之后绑定
+     chapterList.addEventListener('touchend', () => {
+       hoveredItem = null;
+       refreshHighlight();
+     });
+     chapterList.addEventListener('pointerup', (e) => {
+       if (e.pointerType !== 'mouse') {
+         hoveredItem = null;
+         refreshHighlight();
+       }
+     });
+     // 触摸滑动离开列表区域时也清除
+     chapterList.addEventListener('touchcancel', () => {
+       hoveredItem = null;
+       refreshHighlight();
+     });
 
      // === 5. 菜单控制 ===
      function openMenu() {
