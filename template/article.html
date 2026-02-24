@@ -733,7 +733,8 @@
      const middleBtn       = document.getElementById('middleBtn');
      const toTopBtn        = document.getElementById('toTopBtn');
      const chapterList     = document.getElementById('chapterList');
-     const menuLeftEl      = document.querySelector('.menu-left');
+     // chapterList 与 .menu-left 是同一元素，统一用 chapterList 引用
+     const menuLeftEl      = chapterList;
      const menuRightEl     = document.getElementById('menuRightEl');
 
      // ==================== 桌面/移动端检测 ====================
@@ -803,6 +804,7 @@
      let cooldownTimer    = null;  // 居中后 5 秒冷却计时器
      let isInCooldown     = false; // 是否处于冷却期（居中后 5 秒内禁止再次居中）
      let isMenuScrolling  = false;
+     let isProgrammaticScroll = false; // 代码驱动的菜单滚动，不触发 menu 状态
 
      // 唯一入口：设置高亮到指定 id
      function setHighlight(id) {
@@ -822,7 +824,10 @@
        const containerH = chapterList.clientHeight;
        const target     = itemTop - (containerH - itemHeight) / 2;
        if (chapterList.scrollHeight > containerH) {
+         isProgrammaticScroll = true;
          chapterList.scrollTo({ top: Math.max(0, target), behavior });
+         // smooth 滚动无法精确得知何时结束，用保守的超时兜底清除标志
+         setTimeout(() => { isProgrammaticScroll = false; }, 600);
        }
      }
 
@@ -843,7 +848,7 @@
 
      // === 状态：scroll（文章滚动驱动）===
      function applyScrollState(id) {
-       if (activeState === 'hover') return;
+       if (activeState === 'hover' || activeState === 'menu') return;
        activeState = 'scroll';
        currentId   = id;
        setHighlight(id);
@@ -908,11 +913,9 @@
      }
 
      function onItemPointerLeave() {
-       // 立即清除防抖（无论是否在冷却期）
+       // 立即清除防抖计时器，但保留冷却期（让5秒冷却自然超时）
        clearTimeout(hoverScrollTimer);
        hoverScrollTimer = null;
-       // 清除冷却期
-       clearCooldown();
        hoveredItem = null;
        // 恢复滚动驱动状态
        activeState = 'scroll';
@@ -933,7 +936,8 @@
 
      // === 状态：menu（菜单列表滑动）===
      chapterList.addEventListener('scroll', () => {
-       // 移动端 + 桌面端均处理；hover 期间忽略
+       // 程序驱动的滚动不触发 menu 状态；hover 期间忽略
+       if (isProgrammaticScroll) return;
        if (activeState === 'hover') return;
        isMenuScrolling = true;
        activeState = 'menu';
