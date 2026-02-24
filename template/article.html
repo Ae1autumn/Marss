@@ -421,7 +421,8 @@
 
       .menu-left::-webkit-scrollbar { display: none; }
 
-      /* menu-left 的 Reveal 发光边框：使用 CSS 变量 */
+      /* menu-left 的 Reveal 发光边框：已移除，避免嵌套光效 */
+      /*
       .menu-left::before {
          content: '';
          position: absolute;
@@ -442,6 +443,7 @@
          pointer-events: none;
          z-index: 2;
       }
+      */
 
       /* Canvas 叠加层：fixed 定位，专门画章节分隔线的发光 */
       #menuRevealCanvas {
@@ -517,7 +519,8 @@
          border-left-color: rgba(0, 0, 0, 0.06);
       }
 
-      /* menu-right 的 Reveal 发光：使用 CSS 变量 */
+      /* menu-right 的 Reveal 发光：已移除，避免嵌套光效 */
+      /*
       .menu-right::before {
          content: '';
          position: absolute;
@@ -538,6 +541,7 @@
          pointer-events: none;
          z-index: 2;
       }
+      */
 
       .menu-buttons {
          flex: 1;
@@ -749,9 +753,17 @@
        });
 
        // 移动端长按
-       listItem.addEventListener('touchstart', () => {
-         if (!hoverLocked) {
-           onItemPointerEnter(listItem);
+       listItem.addEventListener('touchstart', (e) => {
+          e.preventDefault(); // 防止与滚动冲突
+          if (!hoverLocked) {
+            onItemPointerEnter(listItem);
+          }
+       });
+
+       // 移动端触摸移动时，如果移动幅度较大，视为滚动意图，清除悬停状态
+       listItem.addEventListener('touchmove', (e) => {
+         if (Math.abs(e.movementY) > 5) { // 阈值可调
+             onItemPointerLeave();
          }
        });
 
@@ -876,6 +888,9 @@
      }
 
      function onItemPointerLeave() {
+       if (hoveredItem) {
+         hoveredItem.classList.remove('hovered'); // 确保移除hovered类
+       }
        hoveredItem = null;
        clearTimeout(hoverScrollTimer);
        
@@ -890,7 +905,11 @@
        if (activeState === 'hover') return; // hover 期间忽略菜单滚动
        
        isMenuScrolling = true;
-       activeState = 'menu';
+       // 当菜单开始滚动时，立即清除悬停状态，防止冲突
+       if (activeState === 'hover') {
+         onItemPointerLeave(); // 这会将 activeState 设置为 'scroll'
+       }
+       activeState = 'menu'; // 确保状态变为 'menu'
 
        clearTimeout(menuScrollTimer);
        menuScrollTimer = setTimeout(() => {
@@ -934,6 +953,14 @@
        sideMenu.classList.remove('active');
        menuMask.classList.remove('active');
        menuToggle.style.display = 'flex';
+       // 关闭菜单时清除所有状态和光效
+       activeState = 'scroll';
+       hoveredItem = null;
+       clearTimeout(hoverScrollTimer);
+       clearTimeout(menuScrollTimer);
+       isMenuScrolling = false;
+       hoverLocked = false;
+       clearAllReveal(); // 清除光效
      }
 
      menuToggle.addEventListener('click',  (e) => { e.stopPropagation(); openMenu(); });
@@ -1053,7 +1080,7 @@
      const revealTargets = [
        { el: menuToggle,       range: 60,  alwaysOn: true  },
        { el: sideMenuWrapper,  range: 80,  alwaysOn: false },
-       { el: menuLeftEl,       range: 80,  alwaysOn: false },
+       { el: menuLeftEl,       range: 80,  alwaysOn: false }, // 虽然CSS移除了::before，但仍用于mousemove事件
        { el: menuRightEl,      range: 80,  alwaysOn: false },
      ];
 
@@ -1108,6 +1135,12 @@
      document.addEventListener('mouseleave',   clearAllReveal);
      window.addEventListener('blur',           clearAllReveal);
      window.addEventListener('resize',         resizeCanvas);
+     // 在菜单关闭时也清除光效
+     window.addEventListener('click', (e) => {
+         if (!sideMenuWrapper.contains(e.target) && !menuToggle.contains(e.target) && sideMenuWrapper.classList.contains('active')) {
+             clearAllReveal();
+         }
+     });
 
      } // end isDesktop
 
