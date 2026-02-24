@@ -406,6 +406,8 @@
       .menu-left::-webkit-scrollbar { display: none; }
 
       /* menu-left 的 Reveal 发光 */
+      /* 半径缩小到 60px：只照亮鼠标附近的边框，不穿透相邻 item 间隙 */
+      /* ::before 挂在自身上，不受 overflow-y:auto 裁剪，外侧边也能触发 */
       .menu-left::before {
          content: '';
          position: absolute;
@@ -413,9 +415,9 @@
          border-radius: 12px 0 0 12px;
          padding: 1px;
          background: radial-gradient(
-            130px circle at var(--rx, -9999px) var(--ry, -9999px),
-            rgba(180, 205, 255, 0.7),
-            rgba(108, 143, 255, 0.3) 45%,
+            60px circle at var(--rx, -9999px) var(--ry, -9999px),
+            rgba(180, 205, 255, 0.9),
+            rgba(108, 143, 255, 0.4) 45%,
             transparent 70%
          );
          -webkit-mask:
