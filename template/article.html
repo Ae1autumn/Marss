@@ -545,6 +545,7 @@
       .menu-btn:hover { color: #f00; background-color: rgba(255, 0, 0, 0.1); }
 
       .close-btn {
+         position: relative;
          height: 50px;
          background: rgba(0, 0, 0, 0.15);
          color: rgba(255, 255, 255, 0.6);
@@ -563,13 +564,38 @@
          border-top-color: rgba(0, 0, 0, 0.08);
       }
 
-      /* 桌面端：上边框弱化 */
+      /* 桌面端：上边框弱化，由 Reveal 代替 */
       body.is-desktop .close-btn {
          border-top-color: rgba(255, 255, 255, 0.05);
       }
 
       body.is-desktop.light-mode .close-btn {
          border-top-color: rgba(0, 0, 0, 0.04);
+      }
+
+      /* 桌面端：上边框 Reveal 光效 */
+      body.is-desktop .close-btn::before {
+         content: '';
+         position: absolute;
+         top: -1px;
+         left: 0;
+         right: 0;
+         height: 1px;
+         background: linear-gradient(
+            to right,
+            transparent,
+            rgba(var(--reveal-hi), calc((1 - abs(var(--rx, -9999px) - 0px) / 130)) ),
+            transparent
+         );
+         /* 用 radial-gradient 模拟点光源照在线上 */
+         background: radial-gradient(
+            130px circle at var(--rx, -9999px) 0px,
+            rgba(var(--reveal-hi),  0.95),
+            rgba(var(--reveal-mid), 0.4) 45%,
+            transparent 70%
+         );
+         pointer-events: none;
+         z-index: 3;
       }
 
       .close-btn:hover { color: #f00; background-color: rgba(255, 0, 0, 0.08); }
@@ -1060,6 +1086,7 @@
          { el: sideMenuWrapper,  range: 80,  alwaysOn: false },
          { el: chapterList,      range: 80,  alwaysOn: false },
          { el: menuRightEl,      range: 80,  alwaysOn: false },
+         { el: closeBtn,         range: 80,  alwaysOn: false },
        ];
 
        function clearAllReveal() {
