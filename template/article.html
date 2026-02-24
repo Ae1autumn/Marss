@@ -406,8 +406,6 @@
       .menu-left::-webkit-scrollbar { display: none; }
 
       /* menu-left 的 Reveal 发光 */
-      /* 半径缩小到 60px：只照亮鼠标附近的边框，不穿透相邻 item 间隙 */
-      /* ::before 挂在自身上，不受 overflow-y:auto 裁剪，外侧边也能触发 */
       .menu-left::before {
          content: '';
          position: absolute;
@@ -415,9 +413,9 @@
          border-radius: 12px 0 0 12px;
          padding: 1px;
          background: radial-gradient(
-            60px circle at var(--rx, -9999px) var(--ry, -9999px),
-            rgba(180, 205, 255, 0.9),
-            rgba(108, 143, 255, 0.4) 45%,
+            130px circle at var(--rx, -9999px) var(--ry, -9999px),
+            rgba(180, 205, 255, 0.7),
+            rgba(108, 143, 255, 0.3) 45%,
             transparent 70%
          );
          -webkit-mask:
@@ -771,64 +769,45 @@
      updateProgress();
 
      // ==================== Reveal Highlight ====================
-     // 统一用 document mousemove，在元素外一定范围内也能触发
 
-     const revealTargets = [
-       { el: menuToggle,       range: 60,  alwaysOn: true  },
-       { el: sideMenuWrapper,  range: 80,  alwaysOn: false },
-       { el: menuLeftEl,       range: 80,  alwaysOn: false },
-       { el: menuRightEl,      range: 80,  alwaysOn: false },
-     ];
+     // floating-btn：直接绑定
+     menuToggle.addEventListener('mousemove', (e) => {
+       const r = menuToggle.getBoundingClientRect();
+       menuToggle.style.setProperty('--rx', (e.clientX - r.left) + 'px');
+       menuToggle.style.setProperty('--ry', (e.clientY - r.top)  + 'px');
+     });
+     menuToggle.addEventListener('mouseleave', () => {
+       menuToggle.style.setProperty('--rx', '-9999px');
+     });
 
-     function clearAllReveal() {
-       revealTargets.forEach(({ el }) => {
-         el?.style.setProperty('--rx', '-9999px');
-         el?.style.setProperty('--ry', '-9999px');
-       });
-     }
+     // side-menu-wrapper：外框 Reveal（四边完整，不受 overflow:hidden 限制）
+     // 同时把坐标同步给内层 menu-left 和 menu-right
+     sideMenuWrapper.addEventListener('mousemove', (e) => {
+       // wrapper 外框
+       const wr = sideMenuWrapper.getBoundingClientRect();
+       sideMenuWrapper.style.setProperty('--rx', (e.clientX - wr.left) + 'px');
+       sideMenuWrapper.style.setProperty('--ry', (e.clientY - wr.top)  + 'px');
 
-     function handleMove(e) {
-       // 只处理鼠标，忽略触摸和触控笔
-       if (e.pointerType && e.pointerType !== 'mouse') return;
+       // 左侧章节区（各自转换成相对自身的坐标）
+       if (menuLeftEl) {
+         const lr = menuLeftEl.getBoundingClientRect();
+         menuLeftEl.style.setProperty('--rx', (e.clientX - lr.left) + 'px');
+         menuLeftEl.style.setProperty('--ry', (e.clientY - lr.top)  + 'px');
+       }
 
-       revealTargets.forEach(({ el, range, alwaysOn }) => {
-         if (!el) return;
+       // 右侧按钮区
+       if (menuRightEl) {
+         const rr = menuRightEl.getBoundingClientRect();
+         menuRightEl.style.setProperty('--rx', (e.clientX - rr.left) + 'px');
+         menuRightEl.style.setProperty('--ry', (e.clientY - rr.top)  + 'px');
+       }
+     });
 
-         // 菜单隐藏时，内层元素跳过
-         if (!alwaysOn && !sideMenuWrapper.classList.contains('active')) {
-           el.style.setProperty('--rx', '-9999px');
-           el.style.setProperty('--ry', '-9999px');
-           return;
-         }
-
-         const r    = el.getBoundingClientRect();
-         const dx   = Math.max(r.left - e.clientX, 0, e.clientX - r.right);
-         const dy   = Math.max(r.top  - e.clientY, 0, e.clientY - r.bottom);
-         const dist = Math.sqrt(dx * dx + dy * dy);
-
-         if (dist <= range) {
-           el.style.setProperty('--rx', (e.clientX - r.left) + 'px');
-           el.style.setProperty('--ry', (e.clientY - r.top)  + 'px');
-         } else {
-           el.style.setProperty('--rx', '-9999px');
-           el.style.setProperty('--ry', '-9999px');
-         }
-       });
-     }
-
-     // pointermove：安卓 OTG 鼠标不按键也能持续触发
-     // mousemove：桌面浏览器兜底
-     document.addEventListener('pointermove', handleMove);
-     document.addEventListener('mousemove',   handleMove);
-
-     // 松开左键时重新计算一次（避免松手后残留）
-     document.addEventListener('pointerup',  handleMove);
-     document.addEventListener('mouseup',    handleMove);
-
-     // 鼠标离开窗口 / 窗口失焦 / pointer 离开时全部熄灭
-     document.addEventListener('pointerleave', clearAllReveal);
-     document.addEventListener('mouseleave',   clearAllReveal);
-     window.addEventListener('blur',           clearAllReveal);
+     sideMenuWrapper.addEventListener('mouseleave', () => {
+       sideMenuWrapper.style.setProperty('--rx', '-9999px');
+       menuLeftEl?.style.setProperty('--rx',  '-9999px');
+       menuRightEl?.style.setProperty('--rx', '-9999px');
+     });
 
    </script>
 
