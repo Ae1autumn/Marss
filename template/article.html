@@ -771,44 +771,41 @@
      updateProgress();
 
      // ==================== Reveal Highlight ====================
+     // 统一用 document mousemove，在元素外一定范围内也能触发
 
-     // floating-btn：直接绑定
-     menuToggle.addEventListener('mousemove', (e) => {
-       const r = menuToggle.getBoundingClientRect();
-       menuToggle.style.setProperty('--rx', (e.clientX - r.left) + 'px');
-       menuToggle.style.setProperty('--ry', (e.clientY - r.top)  + 'px');
-     });
-     menuToggle.addEventListener('mouseleave', () => {
-       menuToggle.style.setProperty('--rx', '-9999px');
-     });
+     const revealTargets = [
+       { el: menuToggle,       range: 60,  alwaysOn: true  },
+       { el: sideMenuWrapper,  range: 80,  alwaysOn: false },
+       { el: menuLeftEl,       range: 80,  alwaysOn: false },
+       { el: menuRightEl,      range: 80,  alwaysOn: false },
+     ];
 
-     // side-menu-wrapper：外框 Reveal（四边完整，不受 overflow:hidden 限制）
-     // 同时把坐标同步给内层 menu-left 和 menu-right
-     sideMenuWrapper.addEventListener('mousemove', (e) => {
-       // wrapper 外框
-       const wr = sideMenuWrapper.getBoundingClientRect();
-       sideMenuWrapper.style.setProperty('--rx', (e.clientX - wr.left) + 'px');
-       sideMenuWrapper.style.setProperty('--ry', (e.clientY - wr.top)  + 'px');
+     document.addEventListener('mousemove', (e) => {
+       revealTargets.forEach(({ el, range, alwaysOn }) => {
+         if (!el) return;
 
-       // 左侧章节区（各自转换成相对自身的坐标）
-       if (menuLeftEl) {
-         const lr = menuLeftEl.getBoundingClientRect();
-         menuLeftEl.style.setProperty('--rx', (e.clientX - lr.left) + 'px');
-         menuLeftEl.style.setProperty('--ry', (e.clientY - lr.top)  + 'px');
-       }
+         // 菜单隐藏时，内层元素跳过
+         if (!alwaysOn && !sideMenuWrapper.classList.contains('active')) {
+           el.style.setProperty('--rx', '-9999px');
+           el.style.setProperty('--ry', '-9999px');
+           return;
+         }
 
-       // 右侧按钮区
-       if (menuRightEl) {
-         const rr = menuRightEl.getBoundingClientRect();
-         menuRightEl.style.setProperty('--rx', (e.clientX - rr.left) + 'px');
-         menuRightEl.style.setProperty('--ry', (e.clientY - rr.top)  + 'px');
-       }
-     });
+         const r = el.getBoundingClientRect();
 
-     sideMenuWrapper.addEventListener('mouseleave', () => {
-       sideMenuWrapper.style.setProperty('--rx', '-9999px');
-       menuLeftEl?.style.setProperty('--rx',  '-9999px');
-       menuRightEl?.style.setProperty('--rx', '-9999px');
+         // 鼠标到元素边框的最近距离
+         const dx   = Math.max(r.left - e.clientX, 0, e.clientX - r.right);
+         const dy   = Math.max(r.top  - e.clientY, 0, e.clientY - r.bottom);
+         const dist = Math.sqrt(dx * dx + dy * dy);
+
+         if (dist <= range) {
+           el.style.setProperty('--rx', (e.clientX - r.left) + 'px');
+           el.style.setProperty('--ry', (e.clientY - r.top)  + 'px');
+         } else {
+           el.style.setProperty('--rx', '-9999px');
+           el.style.setProperty('--ry', '-9999px');
+         }
+       });
      });
 
    </script>
