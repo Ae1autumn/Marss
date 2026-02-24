@@ -27,7 +27,6 @@
          max-width: 1000px;
          margin: 0 auto;
          position: relative;
-         min-height: 200vh;
          transition: background-color 0.5s ease, color 0.5s ease;
          overflow-x: hidden;
       }
@@ -313,7 +312,6 @@
       .menu-mask.active { display: block; }
 
       /* ==================== 亚克力侧边菜单 wrapper ==================== */
-      /* wrapper 负责 fixed 定位 + Reveal 发光边框，不受 overflow:hidden 限制 */
       .side-menu-wrapper {
          position: fixed;
          bottom: 30px;
@@ -324,7 +322,6 @@
          border-radius: 12px;
          z-index: 999;
          display: none;
-         /* pointer-events: none 让点击穿透到 side-menu */
          pointer-events: none;
       }
 
@@ -338,7 +335,7 @@
          100% { transform: scale(1);   opacity: 1; }
       }
 
-      /* Reveal 边框层挂在 wrapper 上，四边完整 */
+      /* Reveal 边框层 - 仅桌面端显示 */
       .side-menu-wrapper::before {
          content: '';
          position: absolute;
@@ -358,6 +355,8 @@
          mask-composite: exclude;
          pointer-events: none;
          z-index: 1;
+         /* 移动端隐藏 Reveal 边框，显示普通边框 */
+         opacity: 0;
       }
 
       body.light-mode .side-menu-wrapper::before {
@@ -369,9 +368,13 @@
          );
       }
 
+      /* 桌面端激活 Reveal 边框 */
+      body.is-desktop .side-menu-wrapper::before {
+         opacity: 1;
+      }
+
       /* ==================== 亚克力侧边菜单 ==================== */
       .side-menu {
-         /* 不再 fixed，由 wrapper 控制位置 */
          position: relative;
          width: 100%;
          height: 100%;
@@ -379,19 +382,27 @@
          display: none;
          flex-direction: row;
          overflow: hidden;
-         /* 亚克力 */
          background: rgba(18, 18, 18, 0.6);
          backdrop-filter: blur(24px) saturate(180%);
          -webkit-backdrop-filter: blur(24px) saturate(180%);
-         border: 1px solid rgba(255, 255, 255, 0.1);
-         /* 恢复点击事件 */
+         /* 移动端：显示完整边框 */
+         border: 1px solid rgba(255, 255, 255, 0.18);
          pointer-events: auto;
          transition: background 0.5s ease, border-color 0.5s ease;
       }
 
       body.light-mode .side-menu {
          background: rgba(255, 255, 255, 0.6);
-         border-color: rgba(0, 0, 0, 0.08);
+         border-color: rgba(0, 0, 0, 0.12);
+      }
+
+      /* 桌面端：边框弱化，由 Reveal 代替 */
+      body.is-desktop .side-menu {
+         border-color: rgba(255, 255, 255, 0.07);
+      }
+
+      body.is-desktop.light-mode .side-menu {
+         border-color: rgba(0, 0, 0, 0.05);
       }
 
       .side-menu.active {
@@ -405,7 +416,6 @@
          padding: 20px;
          overflow-y: auto;
          scrollbar-width: none;
-         /* 亚克力底色透明，让父级模糊透过 */
          background: transparent;
          word-wrap: break-word;
          word-break: break-word;
@@ -414,7 +424,7 @@
 
       .menu-left::-webkit-scrollbar { display: none; }
 
-      /* menu-left 的外框 Reveal 仍保留，用于左/上/下边框 */
+      /* menu-left Reveal 边框 - 仅桌面 */
       .menu-left::before {
          content: '';
          position: absolute;
@@ -434,6 +444,7 @@
          mask-composite: exclude;
          pointer-events: none;
          z-index: 2;
+         opacity: 0;
       }
 
       body.light-mode .menu-left::before {
@@ -445,7 +456,11 @@
          );
       }
 
-      /* Canvas 叠加层：fixed 定位，跟随视口，专门画章节分隔线的发光 */
+      body.is-desktop .menu-left::before {
+         opacity: 1;
+      }
+
+      /* Canvas 叠加层 */
       #menuRevealCanvas {
          position: fixed;
          pointer-events: none;
@@ -455,7 +470,7 @@
       }
       #menuRevealCanvas.active { opacity: 1; }
 
-      /* 章节项之间的分隔线 */
+      /* ==================== 章节项 ==================== */
       .chapter-item {
          padding: 10px 0;
          cursor: pointer;
@@ -465,10 +480,9 @@
          word-break: break-word;
          overflow-wrap: break-word;
          position: relative;
-         /* 分割线用伪元素实现，左右留空隙，不贯穿 */
       }
 
-      /* 分割线：左右各留 8px 空隙 */
+      /* 分割线：移动端显示，桌面端隐藏（由 Canvas 光效代替） */
       .chapter-item::after {
          content: '';
          position: absolute;
@@ -477,30 +491,37 @@
          right: 8px;
          height: 1px;
          background: rgba(255, 255, 255, 0.3);
+         transition: opacity 0.3s;
       }
 
       body.light-mode .chapter-item::after {
          background: rgba(0, 0, 0, 0.3);
       }
 
-      /* 最后一个 item 不要分割线 */
+      /* 桌面端隐藏分割线 */
+      body.is-desktop .chapter-item::after {
+         opacity: 0;
+      }
+
       .chapter-item:last-child::after { display: none; }
 
       .chapter-item.h1-item { padding-left: 0; }
       .chapter-item.h2-item { padding-left: 14px; color: rgba(255,255,255,0.45); font-size: 0.9em; }
       .chapter-item.h3-item { padding-left: 28px; color: rgba(255,255,255,0.3);  font-size: 0.85em; }
 
+      body.light-mode .chapter-item { color: rgba(0,0,0,0.7); }
       body.light-mode .chapter-item.h2-item { color: rgba(0,0,0,0.45); }
       body.light-mode .chapter-item.h3-item { color: rgba(0,0,0,0.3); }
 
-      /* 红色 hover 保留 */
-      .chapter-item:hover { color: #f00; }
-      .chapter-item.h1-item:hover { padding-left: 5px; }
-      .chapter-item.h2-item:hover { padding-left: 19px; }
-      .chapter-item.h3-item:hover { padding-left: 33px; }
+      /* 桌面端 hover 红色 */
+      body.is-desktop .chapter-item:hover { color: #f00; }
+      body.is-desktop .chapter-item.h1-item:hover { padding-left: 5px; }
+      body.is-desktop .chapter-item.h2-item:hover { padding-left: 19px; }
+      body.is-desktop .chapter-item.h3-item:hover { padding-left: 33px; }
+
       /* current：滚动追踪高亮 */
       .chapter-item.current { color: red !important; }
-      /* hovered：鼠标悬停时覆盖 current，同一时间只有一个高亮 */
+      /* hovered：鼠标悬停覆盖，同一时间只有一个高亮 */
       .chapter-item.hovered { color: red !important; }
 
       /* ==================== 菜单右侧：按钮区 ==================== */
@@ -510,18 +531,27 @@
          height: 100%;
          display: flex;
          flex-direction: column;
-         /* 亚克力分隔感：稍深一点的半透明 */
          background: rgba(0, 0, 0, 0.2);
-         border-left: 1px solid rgba(255, 255, 255, 0.07);
-         transition: background 0.5s ease;
+         /* 移动端：显示分隔线 */
+         border-left: 1px solid rgba(255, 255, 255, 0.15);
+         transition: background 0.5s ease, border-color 0.5s ease;
       }
 
       body.light-mode .menu-right {
          background: rgba(0, 0, 0, 0.05);
-         border-left-color: rgba(0, 0, 0, 0.06);
+         border-left-color: rgba(0, 0, 0, 0.1);
       }
 
-      /* menu-right 的 Reveal 发光 */
+      /* 桌面端：分隔线弱化，由 Reveal 代替 */
+      body.is-desktop .menu-right {
+         border-left-color: rgba(255, 255, 255, 0.05);
+      }
+
+      body.is-desktop.light-mode .menu-right {
+         border-left-color: rgba(0, 0, 0, 0.04);
+      }
+
+      /* menu-right Reveal 边框 - 仅桌面 */
       .menu-right::before {
          content: '';
          position: absolute;
@@ -541,6 +571,7 @@
          mask-composite: exclude;
          pointer-events: none;
          z-index: 2;
+         opacity: 0;
       }
 
       body.light-mode .menu-right::before {
@@ -550,6 +581,10 @@
             rgba(60, 60, 160, 0.25) 45%,
             transparent 70%
          );
+      }
+
+      body.is-desktop .menu-right::before {
+         opacity: 1;
       }
 
       .menu-buttons {
@@ -562,7 +597,6 @@
          width: 100%;
       }
 
-      /* 红色按钮保留 */
       .menu-btn {
          color: rgba(255, 255, 255, 0.75);
          background: none;
@@ -587,17 +621,27 @@
          background: rgba(0, 0, 0, 0.15);
          color: rgba(255, 255, 255, 0.6);
          border: none;
-         border-top: 1px solid rgba(255, 255, 255, 0.07);
+         /* 移动端：显示上边框 */
+         border-top: 1px solid rgba(255, 255, 255, 0.1);
          cursor: pointer;
          font-size: 16px;
-         transition: background 0.2s, color 0.2s;
+         transition: background 0.2s, color 0.2s, border-color 0.2s;
          width: 100%;
       }
 
       body.light-mode .close-btn {
          background: rgba(0, 0, 0, 0.04);
          color: rgba(0, 0, 0, 0.5);
-         border-top-color: rgba(0, 0, 0, 0.06);
+         border-top-color: rgba(0, 0, 0, 0.08);
+      }
+
+      /* 桌面端：上边框弱化 */
+      body.is-desktop .close-btn {
+         border-top-color: rgba(255, 255, 255, 0.05);
+      }
+
+      body.is-desktop.light-mode .close-btn {
+         border-top-color: rgba(0, 0, 0, 0.04);
       }
 
       .close-btn:hover { color: #f00; background-color: rgba(255, 0, 0, 0.08); }
@@ -663,11 +707,10 @@
 
    <div class="menu-mask" id="menuMask"></div>
 
-   <!-- wrapper 负责 fixed 定位和 Reveal 外框，side-menu 负责内容和亚克力 -->
    <div class="side-menu-wrapper" id="sideMenuWrapper">
       <div class="side-menu" id="sideMenu">
          <div class="menu-left" id="chapterList"></div>
-         <div class="menu-right">
+         <div class="menu-right" id="menuRightEl">
             <div class="menu-buttons">
                <button class="menu-btn" id="toBottomBtn">▼</button>
                <button class="menu-btn" id="middleBtn">◎</button>
@@ -678,21 +721,24 @@
       </div>
    </div>
 
-   <!-- Canvas 叠加层：专门画章节分隔线的发光，fixed 定位不受滚动影响 -->
    <canvas id="menuRevealCanvas"></canvas>
 
    <script>
-     const menuToggle     = document.getElementById('menuToggle');
-     const sideMenuWrapper= document.getElementById('sideMenuWrapper');
-     const sideMenu       = document.getElementById('sideMenu');
-     const menuMask       = document.getElementById('menuMask');
-     const closeBtn       = document.getElementById('closeBtn');
-     const toBottomBtn    = document.getElementById('toBottomBtn');
-     const middleBtn      = document.getElementById('middleBtn');
-     const toTopBtn       = document.getElementById('toTopBtn');
-     const chapterList    = document.getElementById('chapterList');
-     const menuLeftEl     = document.querySelector('.menu-left');
-     const menuRightEl    = document.querySelector('.menu-right');
+     const menuToggle      = document.getElementById('menuToggle');
+     const sideMenuWrapper = document.getElementById('sideMenuWrapper');
+     const sideMenu        = document.getElementById('sideMenu');
+     const menuMask        = document.getElementById('menuMask');
+     const closeBtn        = document.getElementById('closeBtn');
+     const toBottomBtn     = document.getElementById('toBottomBtn');
+     const middleBtn       = document.getElementById('middleBtn');
+     const toTopBtn        = document.getElementById('toTopBtn');
+     const chapterList     = document.getElementById('chapterList');
+     const menuLeftEl      = document.querySelector('.menu-left');
+     const menuRightEl     = document.getElementById('menuRightEl');
+
+     // ==================== 桌面/移动端检测 ====================
+     const isDesktop = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+     if (isDesktop) document.body.classList.add('is-desktop');
 
      // === 1. 收集 h1/h2/h3，生成唯一 ID ===
      const allHeadings = Array.from(
@@ -710,6 +756,8 @@
        const mode = savedTheme || configTheme;
        document.body.classList.toggle('light-mode', mode === 'light');
        document.body.classList.toggle('dark-mode',  mode !== 'light');
+       // 同步 floating-btn 颜色
+       menuToggle.style.color = mode === 'light' ? '#000' : '#fff';
      }
      applyTheme();
 
@@ -728,30 +776,33 @@
          closeMenu();
        });
 
-       // hover 高亮：仅桌面鼠标触发，移动端触摸完全跳过
-       listItem.addEventListener('pointerenter', (e) => {
-         if (e.pointerType !== 'mouse') return;
-         onItemPointerEnter(listItem);
-       });
-       listItem.addEventListener('pointerleave', (e) => {
-         if (e.pointerType !== 'mouse') return;
-         onItemPointerLeave();
-       });
+       // 悬停：仅桌面鼠标触发
+       if (isDesktop) {
+         listItem.addEventListener('pointerenter', (e) => {
+           if (e.pointerType !== 'mouse') return;
+           onItemPointerEnter(listItem);
+         });
+         listItem.addEventListener('pointerleave', (e) => {
+           if (e.pointerType !== 'mouse') return;
+           onItemPointerLeave();
+         });
+       }
 
        chapterList.appendChild(listItem);
      });
 
      // ==================== 高亮状态机 ====================
-     // 三个互斥状态，优先级：居中(menu-scroll) > 悬停(hover) > 滚动(scroll)
-     // 同一时间只有一个 item 处于高亮，通过 activeId 统一管理
+     // 三个互斥状态：scroll（滚动驱动）| hover（鼠标悬停）| menu（菜单列表滑动）
 
-     let currentId   = null; // 文章滚动驱动的当前标题 id
-     let hoveredItem = null; // 鼠标悬停的 chapter-item 元素
-     let activeState = 'scroll'; // 'scroll' | 'hover' | 'menu'
+     let currentId        = null;  // 文章滚动驱动的当前标题 id
+     let hoveredItem      = null;  // 鼠标悬停的 chapter-item 元素
+     let activeState      = 'scroll';
 
-     let hoverScrollTimer   = null; // 悬停后滚动居中的防抖
-     let menuScrollTimer    = null; // 菜单滚动停止后对齐的防抖
-     let isMenuScrolling    = false;// 菜单是否正在被用户滑动
+     let hoverScrollTimer = null;  // 悬停后居中的防抖
+     let menuScrollTimer  = null;  // 菜单滚动停止后对齐的防抖
+     let cooldownTimer    = null;  // 居中后 5 秒冷却计时器
+     let isInCooldown     = false; // 是否处于冷却期（居中后 5 秒内禁止再次居中）
+     let isMenuScrolling  = false;
 
      // 唯一入口：设置高亮到指定 id
      function setHighlight(id) {
@@ -766,10 +817,10 @@
      function scrollMenuToItem(id, behavior = 'smooth') {
        const item = document.querySelector(`.chapter-item[data-id="${id}"]`);
        if (!item) return;
-       const itemTop      = item.offsetTop;
-       const itemHeight   = item.offsetHeight;
-       const containerH   = chapterList.clientHeight;
-       const target       = itemTop - (containerH - itemHeight) / 2;
+       const itemTop    = item.offsetTop;
+       const itemHeight = item.offsetHeight;
+       const containerH = chapterList.clientHeight;
+       const target     = itemTop - (containerH - itemHeight) / 2;
        if (chapterList.scrollHeight > containerH) {
          chapterList.scrollTo({ top: Math.max(0, target), behavior });
        }
@@ -792,7 +843,7 @@
 
      // === 状态：scroll（文章滚动驱动）===
      function applyScrollState(id) {
-       if (activeState === 'hover') return; // hover 期间不覆盖
+       if (activeState === 'hover') return;
        activeState = 'scroll';
        currentId   = id;
        setHighlight(id);
@@ -821,75 +872,113 @@
 
      window.addEventListener('scroll', updateActiveHeading, { passive: true });
 
-     // === 状态：hover（鼠标悬停）===
-     // 已在 allHeadings.forEach 里通过 pointerenter/pointerleave 绑定
-     // 这里提供 enter/leave 的实现供绑定时调用
+     // === 状态：hover（鼠标悬停，仅桌面）===
+
+     function startCooldown() {
+       isInCooldown = true;
+       clearTimeout(cooldownTimer);
+       cooldownTimer = setTimeout(() => {
+         isInCooldown = false;
+       }, 5000);
+     }
+
+     function clearCooldown() {
+       isInCooldown = false;
+       clearTimeout(cooldownTimer);
+       cooldownTimer = null;
+     }
 
      function onItemPointerEnter(item) {
+       // 进入 hover 状态
        hoveredItem = item;
        activeState = 'hover';
        setHighlight(item.dataset.id);
-       // 防抖 350ms 后滚动居中
+
+       // 冷却期内：高亮跟随，但不触发居中防抖
+       if (isInCooldown) return;
+
+       // 非冷却期：防抖 350ms 后居中
        clearTimeout(hoverScrollTimer);
        hoverScrollTimer = setTimeout(() => {
+         // 再次检查：如果已退出 hover 状态则取消
+         if (activeState !== 'hover' || hoveredItem !== item) return;
          scrollMenuToItem(item.dataset.id);
+         startCooldown();
        }, 350);
      }
 
      function onItemPointerLeave() {
-       hoveredItem = null;
+       // 立即清除防抖（无论是否在冷却期）
        clearTimeout(hoverScrollTimer);
-       // 恢复 scroll 状态
+       hoverScrollTimer = null;
+       // 清除冷却期
+       clearCooldown();
+       hoveredItem = null;
+       // 恢复滚动驱动状态
        activeState = 'scroll';
        setHighlight(currentId);
+       // 将菜单滚回当前滚动驱动的 item
        scrollMenuToItem(currentId);
      }
 
-     // === 状态：menu（菜单列表滚动）===
-     // 用户直接滑动菜单列表时触发
+     // 鼠标离开整个 menu-left 区域时强制退出 hover
+     if (isDesktop) {
+       menuLeftEl.addEventListener('pointerleave', (e) => {
+         if (e.pointerType !== 'mouse') return;
+         if (activeState === 'hover') {
+           onItemPointerLeave();
+         }
+       });
+     }
+
+     // === 状态：menu（菜单列表滑动）===
      chapterList.addEventListener('scroll', () => {
-       if (activeState === 'hover') return; // hover 期间忽略菜单滚动
+       // 移动端 + 桌面端均处理；hover 期间忽略
+       if (activeState === 'hover') return;
        isMenuScrolling = true;
        activeState = 'menu';
 
        clearTimeout(menuScrollTimer);
        menuScrollTimer = setTimeout(() => {
          isMenuScrolling = false;
-         // 找到最靠近中心的 item
          const centerId = getCenteredItemId();
          if (centerId) {
-           // 先滚动对齐，再高亮
            scrollMenuToItem(centerId);
            setTimeout(() => {
-             activeState = 'menu';
-             setHighlight(centerId);
-             // 500ms 后无操作则回归 scroll 状态
-             setTimeout(() => {
-               if (activeState === 'menu' && !hoveredItem) {
-                 activeState = 'scroll';
-                 setHighlight(currentId);
-                 scrollMenuToItem(currentId);
-               }
-             }, 1500);
+             if (activeState === 'menu' && !hoveredItem) {
+               setHighlight(centerId);
+               // 1.5 秒后无操作则回归 scroll 状态
+               setTimeout(() => {
+                 if (activeState === 'menu' && !hoveredItem) {
+                   activeState = 'scroll';
+                   setHighlight(currentId);
+                   scrollMenuToItem(currentId);
+                 }
+               }, 1500);
+             }
            }, 300);
          }
-       }, 500);
+       }, 150); // 防抖时间缩短，减少快速滚动时的闪烁
      }, { passive: true });
 
-     // 移动端松手/取消后清除 hover 残留（兜底）
-     chapterList.addEventListener('touchend',    () => { if (hoveredItem) onItemPointerLeave(); });
-     chapterList.addEventListener('touchcancel', () => { if (hoveredItem) onItemPointerLeave(); });
-     chapterList.addEventListener('pointerup',   (e) => {
-       if (e.pointerType !== 'mouse' && hoveredItem) onItemPointerLeave();
+     // 移动端触摸结束/取消：清除任何残留的 hover 状态（兜底）
+     // 移动端没有 hover 状态，这里只是保险
+     chapterList.addEventListener('touchend',    () => {
+       if (hoveredItem) { hoveredItem = null; }
+     });
+     chapterList.addEventListener('touchcancel', () => {
+       if (hoveredItem) { hoveredItem = null; }
      });
 
-     // === 5. 菜单控制 ===
+     // === 4. 菜单控制 ===
      function openMenu() {
        sideMenuWrapper.classList.add('active');
        sideMenu.classList.add('active');
        menuMask.classList.add('active');
        menuToggle.style.display = 'none';
-       if (currentId) scrollMenuToItem(currentId);
+       if (currentId) scrollMenuToItem(currentId, 'instant');
+       // 打开时刷新 canvas 尺寸
+       if (isDesktop) resizeCanvas();
      }
 
      function closeMenu() {
@@ -897,6 +986,17 @@
        sideMenu.classList.remove('active');
        menuMask.classList.remove('active');
        menuToggle.style.display = 'flex';
+       // 关闭菜单时：清除所有 hover/悬停状态和 canvas
+       if (isDesktop) {
+         clearAllReveal();
+         if (activeState === 'hover') {
+           clearTimeout(hoverScrollTimer);
+           clearCooldown();
+           hoveredItem  = null;
+           activeState  = 'scroll';
+           setHighlight(currentId);
+         }
+       }
      }
 
      menuToggle.addEventListener('click',  (e) => { e.stopPropagation(); openMenu(); });
@@ -923,7 +1023,7 @@
        closeMenu();
      });
 
-     // === 6. 滚动进度指示器 ===
+     // === 5. 滚动进度指示器 ===
      function updateProgress() {
        const scrollHeight   = document.documentElement.scrollHeight - window.innerHeight;
        const scrollPosition = window.scrollY;
@@ -937,131 +1037,152 @@
      window.addEventListener('resize', updateProgress, { passive: true });
      updateProgress();
 
-     // ==================== Reveal Highlight ====================
-     // 仅桌面端生效
-     const isDesktop = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
-
+     // ==================== Reveal Highlight（仅桌面）====================
      if (isDesktop) {
 
-     const canvas   = document.getElementById('menuRevealCanvas');
-     const ctx      = canvas.getContext('2d');
+       const canvas = document.getElementById('menuRevealCanvas');
+       const ctx    = canvas.getContext('2d');
 
-     // 更新 canvas 尺寸和位置，与 menu-left 完全重叠
-     function resizeCanvas() {
-       if (!sideMenuWrapper.classList.contains('active')) return;
-       const r = menuLeftEl.getBoundingClientRect();
-       canvas.width  = r.width;
-       canvas.height = r.height;
-       canvas.style.left = r.left + 'px';
-       canvas.style.top  = r.top  + 'px';
-     }
+       // 缓存的 canvas 位置，避免每帧都 getBoundingClientRect
+       let cachedMenuRect = null;
 
-     // 画章节分隔线的发光：遍历所有 chapter-item 的 border-bottom 位置
-     // getBoundingClientRect 实时取位置，不受 scrollTop 影响
-     function drawDividerGlow(mouseX, mouseY) {
-       ctx.clearRect(0, 0, canvas.width, canvas.height);
-       if (!sideMenuWrapper.classList.contains('active')) return;
-
-       // 日夜模式适配发光颜色
-       const isLight  = document.body.classList.contains('light-mode');
-       const colorHi  = isLight ? '80,80,180'   : '180,205,255';
-       const colorMid = isLight ? '60,60,160'   : '108,143,255';
-
-       const menuRect = menuLeftEl.getBoundingClientRect();
-       const items    = menuLeftEl.querySelectorAll('.chapter-item:not(:last-child)');
-       const radius   = 80;
-
-       const mdx   = Math.max(menuRect.left - mouseX, 0, mouseX - menuRect.right);
-       const mdy   = Math.max(menuRect.top  - mouseY, 0, mouseY - menuRect.bottom);
-       const mdist = Math.sqrt(mdx * mdx + mdy * mdy);
-       if (mdist > radius) return;
-
-       items.forEach(item => {
-         const itemRect  = item.getBoundingClientRect();
-         const lineY     = itemRect.bottom - menuRect.top;
-         const lineLeft  = itemRect.left  - menuRect.left + 8;
-         const lineRight = itemRect.right - menuRect.left - 8;
-         const nearestX  = Math.max(lineLeft, Math.min(mouseX - menuRect.left, lineRight));
-         const dist      = Math.hypot(
-           mouseX - menuRect.left - nearestX,
-           mouseY - menuRect.top  - lineY
-         );
-
-         if (dist > radius) return;
-
-         const intensity = 1 - dist / radius;
-         const gx   = mouseX - menuRect.left;
-         const grad = ctx.createRadialGradient(gx, lineY, 0, gx, lineY, radius);
-         grad.addColorStop(0,   `rgba(${colorHi},${0.9 * intensity})`);
-         grad.addColorStop(0.4, `rgba(${colorMid},${0.4 * intensity})`);
-         grad.addColorStop(1,   `rgba(${colorMid},0)`);
-
-         ctx.beginPath();
-         ctx.moveTo(lineLeft,  lineY);
-         ctx.lineTo(lineRight, lineY);
-         ctx.lineWidth   = 1;
-         ctx.strokeStyle = grad;
-         ctx.stroke();
-       });
-     }
-
-     const revealTargets = [
-       { el: menuToggle,       range: 60,  alwaysOn: true  },
-       { el: sideMenuWrapper,  range: 80,  alwaysOn: false },
-       { el: menuLeftEl,       range: 80,  alwaysOn: false },
-       { el: menuRightEl,      range: 80,  alwaysOn: false },
-     ];
-
-     function clearAllReveal() {
-       revealTargets.forEach(({ el }) => {
-         el?.style.setProperty('--rx', '-9999px');
-         el?.style.setProperty('--ry', '-9999px');
-       });
-       ctx.clearRect(0, 0, canvas.width, canvas.height);
-       canvas.classList.remove('active');
-     }
-
-     function handleMove(e) {
-       if (e.pointerType && e.pointerType !== 'mouse') return;
-       const menuActive = sideMenuWrapper.classList.contains('active');
-
-       revealTargets.forEach(({ el, range, alwaysOn }) => {
-         if (!el) return;
-         if (!alwaysOn && !menuActive) {
-           el.style.setProperty('--rx', '-9999px');
-           el.style.setProperty('--ry', '-9999px');
-           return;
-         }
-         const r    = el.getBoundingClientRect();
-         const dx   = Math.max(r.left - e.clientX, 0, e.clientX - r.right);
-         const dy   = Math.max(r.top  - e.clientY, 0, e.clientY - r.bottom);
-         const dist = Math.sqrt(dx * dx + dy * dy);
-         if (dist <= range) {
-           el.style.setProperty('--rx', (e.clientX - r.left) + 'px');
-           el.style.setProperty('--ry', (e.clientY - r.top)  + 'px');
-         } else {
-           el.style.setProperty('--rx', '-9999px');
-           el.style.setProperty('--ry', '-9999px');
-         }
-       });
-
-       // 更新 canvas 分隔线发光
-       if (menuActive) {
-         resizeCanvas();
-         canvas.classList.add('active');
-         drawDividerGlow(e.clientX, e.clientY);
+       function resizeCanvas() {
+         if (!sideMenuWrapper.classList.contains('active')) return;
+         const r = menuLeftEl.getBoundingClientRect();
+         canvas.width  = r.width;
+         canvas.height = r.height;
+         canvas.style.left = r.left + 'px';
+         canvas.style.top  = r.top  + 'px';
+         cachedMenuRect = r;
        }
-     }
 
-     document.addEventListener('pointermove',  handleMove);
-     document.addEventListener('mousemove',    handleMove);
-     document.addEventListener('pointerup',    handleMove);
-     document.addEventListener('mouseup',      handleMove);
-     document.addEventListener('pointerleave', clearAllReveal);
-     document.addEventListener('mouseleave',   clearAllReveal);
-     window.addEventListener('blur',           clearAllReveal);
-     // 菜单关闭时清除 canvas
-     window.addEventListener('resize',         resizeCanvas);
+       // 菜单列表滚动时，重新同步 canvas 位置（分割线位置变了）
+       chapterList.addEventListener('scroll', () => {
+         if (sideMenuWrapper.classList.contains('active')) {
+           // 用 rAF 避免滚动期间频繁 reflow
+           requestAnimationFrame(() => {
+             resizeCanvas();
+             // 清空 canvas，光效在下次 mousemove 时重绘
+             ctx.clearRect(0, 0, canvas.width, canvas.height);
+           });
+         }
+       }, { passive: true });
+
+       // 画章节分隔线发光
+       function drawDividerGlow(mouseX, mouseY) {
+         ctx.clearRect(0, 0, canvas.width, canvas.height);
+         if (!sideMenuWrapper.classList.contains('active')) return;
+         if (!cachedMenuRect) return;
+
+         const isLight  = document.body.classList.contains('light-mode');
+         const colorHi  = isLight ? '80,80,180'   : '180,205,255';
+         const colorMid = isLight ? '60,60,160'   : '108,143,255';
+
+         const menuRect = cachedMenuRect;
+         const items    = menuLeftEl.querySelectorAll('.chapter-item:not(:last-child)');
+         const radius   = 80;
+
+         const mdx   = Math.max(menuRect.left - mouseX, 0, mouseX - menuRect.right);
+         const mdy   = Math.max(menuRect.top  - mouseY, 0, mouseY - menuRect.bottom);
+         const mdist = Math.sqrt(mdx * mdx + mdy * mdy);
+         if (mdist > radius) return;
+
+         items.forEach(item => {
+           // 实时获取 item 的位置（考虑列表滚动）
+           const itemRect  = item.getBoundingClientRect();
+           const lineY     = itemRect.bottom - menuRect.top;
+           const lineLeft  = itemRect.left  - menuRect.left + 8;
+           const lineRight = itemRect.right - menuRect.left - 8;
+
+           // 跳过不在 canvas 可见区域内的分割线
+           if (lineY < 0 || lineY > canvas.height) return;
+
+           const nearestX  = Math.max(lineLeft, Math.min(mouseX - menuRect.left, lineRight));
+           const dist      = Math.hypot(
+             mouseX - menuRect.left - nearestX,
+             mouseY - menuRect.top  - lineY
+           );
+
+           if (dist > radius) return;
+
+           const intensity = 1 - dist / radius;
+           const gx   = mouseX - menuRect.left;
+           const grad = ctx.createRadialGradient(gx, lineY, 0, gx, lineY, radius);
+           grad.addColorStop(0,   `rgba(${colorHi},${0.9 * intensity})`);
+           grad.addColorStop(0.4, `rgba(${colorMid},${0.4 * intensity})`);
+           grad.addColorStop(1,   `rgba(${colorMid},0)`);
+
+           ctx.beginPath();
+           ctx.moveTo(lineLeft,  lineY);
+           ctx.lineTo(lineRight, lineY);
+           ctx.lineWidth   = 1;
+           ctx.strokeStyle = grad;
+           ctx.stroke();
+         });
+       }
+
+       const revealTargets = [
+         { el: menuToggle,       range: 60,  alwaysOn: true  },
+         { el: sideMenuWrapper,  range: 80,  alwaysOn: false },
+         { el: menuLeftEl,       range: 80,  alwaysOn: false },
+         { el: menuRightEl,      range: 80,  alwaysOn: false },
+       ];
+
+       function clearAllReveal() {
+         revealTargets.forEach(({ el }) => {
+           el?.style.setProperty('--rx', '-9999px');
+           el?.style.setProperty('--ry', '-9999px');
+         });
+         ctx.clearRect(0, 0, canvas.width, canvas.height);
+         canvas.classList.remove('active');
+       }
+
+       function handleMove(e) {
+         // 只处理鼠标事件
+         if (e.pointerType && e.pointerType !== 'mouse') return;
+         const menuActive = sideMenuWrapper.classList.contains('active');
+
+         revealTargets.forEach(({ el, range, alwaysOn }) => {
+           if (!el) return;
+           if (!alwaysOn && !menuActive) {
+             el.style.setProperty('--rx', '-9999px');
+             el.style.setProperty('--ry', '-9999px');
+             return;
+           }
+           const r    = el.getBoundingClientRect();
+           const dx   = Math.max(r.left - e.clientX, 0, e.clientX - r.right);
+           const dy   = Math.max(r.top  - e.clientY, 0, e.clientY - r.bottom);
+           const dist = Math.sqrt(dx * dx + dy * dy);
+           if (dist <= range) {
+             el.style.setProperty('--rx', (e.clientX - r.left) + 'px');
+             el.style.setProperty('--ry', (e.clientY - r.top)  + 'px');
+           } else {
+             el.style.setProperty('--rx', '-9999px');
+             el.style.setProperty('--ry', '-9999px');
+           }
+         });
+
+         // 更新 canvas 分隔线发光
+         if (menuActive) {
+           // 只在 cachedMenuRect 不存在时才 resize（打开时已经缓存了）
+           if (!cachedMenuRect) resizeCanvas();
+           canvas.classList.add('active');
+           drawDividerGlow(e.clientX, e.clientY);
+         }
+       }
+
+       // 只绑定 pointermove，去掉重复的 mousemove
+       document.addEventListener('pointermove',  handleMove);
+       document.addEventListener('pointerup',    handleMove);
+       document.addEventListener('pointerleave', clearAllReveal);
+       window.addEventListener('blur',           clearAllReveal);
+
+       // resize 时同步 canvas 尺寸
+       window.addEventListener('resize', () => {
+         cachedMenuRect = null;
+         resizeCanvas();
+         updateProgress();
+       });
 
      } // end isDesktop
 
