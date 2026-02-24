@@ -712,7 +712,8 @@
      let cooldownTimer    = null;  // 居中后 5 秒冷却计时器
      let isInCooldown     = false; // 是否处于冷却期（居中后 5 秒内禁止再次居中）
      let isMenuScrolling  = false;
-     let isProgrammaticScroll = false; // 代码驱动的菜单滚动，不触发 menu 状态
+     let isProgrammaticScroll  = false; // 代码驱动的菜单滚动，不触发 menu 状态
+     let isMenuDrivingArticle  = false; // 菜单正在驱动文章滚动，屏蔽反向的 scroll 监听
 
      // 唯一入口：设置高亮到指定 id
      function setHighlight(id) {
@@ -765,6 +766,7 @@
 
      function updateActiveHeading() {
        if (allHeadings.length === 0) return;
+       if (isMenuDrivingArticle) return;  // 菜单驱动文章期间，屏蔽反向触发
        const scrollY = window.scrollY;
        const offset  = 80;
        let current   = allHeadings[0];
@@ -859,6 +861,17 @@
            setTimeout(() => {
              if (activeState === 'menu' && !hoveredItem) {
                setHighlight(centerId);
+
+               // ── 新增：驱动文章滚动到对应标题 ──
+               const targetHeading = document.getElementById(centerId);
+               if (targetHeading) {
+                 isMenuDrivingArticle = true;
+                 currentId = centerId;  // 提前同步，防止回归 scroll 时闪烁
+                 targetHeading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                 // smooth 滚动结束时间不定，用保守超时释放屏蔽
+                 setTimeout(() => { isMenuDrivingArticle = false; }, 800);
+               }
+
                // 1.5 秒后无操作则回归 scroll 状态
                setTimeout(() => {
                  if (activeState === 'menu' && !hoveredItem) {
