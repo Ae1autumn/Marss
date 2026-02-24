@@ -787,7 +787,10 @@
        });
      }
 
-     document.addEventListener('mousemove', (e) => {
+     function handleMove(e) {
+       // 只处理鼠标，忽略触摸和触控笔
+       if (e.pointerType && e.pointerType !== 'mouse') return;
+
        revealTargets.forEach(({ el, range, alwaysOn }) => {
          if (!el) return;
 
@@ -798,9 +801,7 @@
            return;
          }
 
-         const r = el.getBoundingClientRect();
-
-         // 鼠标到元素边框的最近距离
+         const r    = el.getBoundingClientRect();
          const dx   = Math.max(r.left - e.clientX, 0, e.clientX - r.right);
          const dy   = Math.max(r.top  - e.clientY, 0, e.clientY - r.bottom);
          const dist = Math.sqrt(dx * dx + dy * dy);
@@ -813,11 +814,21 @@
            el.style.setProperty('--ry', '-9999px');
          }
        });
-     });
+     }
 
-     // 鼠标离开窗口 / 窗口失焦时熄灭所有光效
-     document.addEventListener('mouseleave', clearAllReveal);
-     window.addEventListener('blur', clearAllReveal);
+     // pointermove：安卓 OTG 鼠标不按键也能持续触发
+     // mousemove：桌面浏览器兜底
+     document.addEventListener('pointermove', handleMove);
+     document.addEventListener('mousemove',   handleMove);
+
+     // 松开左键时重新计算一次（避免松手后残留）
+     document.addEventListener('pointerup',  handleMove);
+     document.addEventListener('mouseup',    handleMove);
+
+     // 鼠标离开窗口 / 窗口失焦 / pointer 离开时全部熄灭
+     document.addEventListener('pointerleave', clearAllReveal);
+     document.addEventListener('mouseleave',   clearAllReveal);
+     window.addEventListener('blur',           clearAllReveal);
 
    </script>
 
