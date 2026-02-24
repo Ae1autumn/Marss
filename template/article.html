@@ -780,6 +780,13 @@
        { el: menuRightEl,      range: 80,  alwaysOn: false },
      ];
 
+     function clearAllReveal() {
+       revealTargets.forEach(({ el }) => {
+         el?.style.setProperty('--rx', '-9999px');
+         el?.style.setProperty('--ry', '-9999px');
+       });
+     }
+
      document.addEventListener('mousemove', (e) => {
        revealTargets.forEach(({ el, range, alwaysOn }) => {
          if (!el) return;
@@ -807,6 +814,10 @@
          }
        });
      });
+
+     // 鼠标离开窗口 / 窗口失焦时熄灭所有光效
+     document.addEventListener('mouseleave', clearAllReveal);
+     window.addEventListener('blur', clearAllReveal);
 
    </script>
 
