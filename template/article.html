@@ -728,12 +728,14 @@
          closeMenu();
        });
 
-       // hover 高亮：覆盖 current，离开后恢复
-       listItem.addEventListener('mouseenter', () => {
+       // hover 高亮：仅桌面鼠标触发，移动端触摸完全跳过
+       listItem.addEventListener('pointerenter', (e) => {
+         if (e.pointerType !== 'mouse') return;
          hoveredItem = listItem;
          refreshHighlight();
        });
-       listItem.addEventListener('mouseleave', () => {
+       listItem.addEventListener('pointerleave', (e) => {
+         if (e.pointerType !== 'mouse') return;
          hoveredItem = null;
          refreshHighlight();
        });
