@@ -39,8 +39,8 @@
       body.dark-mode {
          background-color: #121212;
          color: #ffffff;
-         --reveal-hi:  180, 205, 255;
-         --reveal-mid: 108, 143, 255;
+         --reveal-hi:  255, 0, 0;
+         --reveal-mid: 180, 30, 30;
       }
 
       body.light-mode {
@@ -400,8 +400,8 @@
          border-radius: 12px 0 0 12px;
          background: radial-gradient(
             60px circle at var(--rx, -9999px) var(--ry, -9999px),
-            rgba(var(--reveal-hi),  0.9),
-            rgba(var(--reveal-mid), 0.4) 45%,
+            rgba(var(--reveal-hi),  1.0),
+            rgba(var(--reveal-mid), 0.65) 45%,
             transparent 70%
          );
          opacity: 0;
@@ -870,7 +870,7 @@
              }
            }, 300);
          }
-       }, 150); // 防抖时间缩短，减少快速滚动时的闪烁
+       }, 70); // 防抖时间，减少快速滚动时的闪烁
      }, { passive: true });
 
      // 移动端触摸结束/取消：清除任何残留的 hover 状态（兜底）
@@ -1020,8 +1020,8 @@
            const intensity = 1 - dist / radius;
            const gx   = mouseX - menuRect.left;
            const grad = ctx.createRadialGradient(gx, lineY, 0, gx, lineY, radius);
-           grad.addColorStop(0,   `rgba(${colorHi},${0.9 * intensity})`);
-           grad.addColorStop(0.4, `rgba(${colorMid},${0.4 * intensity})`);
+           grad.addColorStop(0,   `rgba(${colorHi},${1.0 * intensity})`);
+           grad.addColorStop(0.4, `rgba(${colorMid},${0.65 * intensity})`);
            grad.addColorStop(1,   `rgba(${colorMid},0)`);
 
            ctx.beginPath();
