@@ -864,12 +864,7 @@
 
         // === 状态：scroll ===
         function applyScrollState(id) {
-          // 关键修复：即使在hover或menu状态，也更新currentId以保持位置同步
-          // 但只有在scroll状态下才改变视觉高亮和菜单位置
-          if (activeState === 'hover' || activeState === 'menu') {
-            currentId = id; // 保持currentId同步，但不改变视觉状态
-            return;
-          }
+          if (activeState === 'hover' || activeState === 'menu') return;
           activeState = 'scroll';
           currentId   = id;
           setHighlight(id);
@@ -902,9 +897,7 @@
         // === 状态：hover ===
         async function onHoverScrollDebounced(item) {
           if (activeState !== 'hover' || hoveredItem !== item) return;
-          // 移除多余的setHighlight(item.dataset.id)调用
-          // 因为在onItemPointerEnter时已经设置过，且我们修复了applyScrollState
-          // 确保在hover状态下即使页面滚动也不会改变视觉高亮
+          setHighlight(item.dataset.id);
 
           // 先等菜单居中完成，再跳转文章，避免两个 smoothScrollPromise 并发竞争
           isHoverScrolling = true;
