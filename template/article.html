@@ -896,21 +896,14 @@
         function onHoverScrollDebounced(item) {
           if (activeState !== 'hover' || hoveredItem !== item) return;
           setHighlight(item.dataset.id);
-          // 居中和文章跳转同时触发，不串行等待
           scrollMenuToItem(item.dataset.id);
 
+          // hover 跳转不需要 menuDrivingArticleCount，
+          // 直接跳，让 updateActiveHeading 自然处理 currentId 更新
           const targetHeading = document.getElementById(item.dataset.id);
           if (targetHeading) {
-            menuDrivingArticleCount++;
-            smoothScrollPromise(
-              () => targetHeading.scrollIntoView({ behavior: 'smooth', block: 'start' }),
-              () => window.scrollY
-            ).finally(() => {
-              menuDrivingArticleCount--;
-              if (activeState === 'hover' && hoveredItem === item) {
-                currentId = item.dataset.id;
-              }
-            });
+            currentId = item.dataset.id;
+            targetHeading.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }
         }
 
