@@ -581,15 +581,8 @@
          left: 0;
          right: 0;
          height: 1px;
-         background: linear-gradient(
-            to right,
-            transparent,
-            rgba(var(--reveal-hi), calc((1 - abs(var(--rx, -9999px) - 0px) / 130)) ),
-            transparent
-         );
-         /* 用 radial-gradient 模拟点光源照在线上 */
          background: radial-gradient(
-            130px circle at var(--rx, -9999px) 0px,
+            130px circle at var(--rx, -9999px) var(--ry, -9999px),
             rgba(var(--reveal-hi),  0.95),
             rgba(var(--reveal-mid), 0.4) 45%,
             transparent 70%
@@ -601,14 +594,9 @@
       .close-btn:hover { color: #f00; background-color: rgba(255, 0, 0, 0.08); }
 
       /* ==================== Reveal：floating-btn ==================== */
+      /* background は JS の updateProgress が動的に書き換える */
       .floating-btn::before {
          border-radius: 50%;
-         background: radial-gradient(
-            80px circle at var(--rx, -9999px) var(--ry, -9999px),
-            rgba(var(--reveal-hi),  0.95),
-            rgba(var(--reveal-mid), 0.45) 45%,
-            transparent 70%
-         );
       }
 
       .header, .floating-btn, .side-menu, .comments {
@@ -974,6 +962,10 @@
      });
 
      // === 5. 滚动进度指示器 ===
+     // floating-btn Reveal 色を進度に応じて動的に更新するための <style> タグ
+     const toggleRevealStyle = document.createElement('style');
+     document.head.appendChild(toggleRevealStyle);
+
      function updateProgress() {
        const scrollHeight   = document.documentElement.scrollHeight - window.innerHeight;
        const scrollPosition = window.scrollY;
@@ -981,6 +973,38 @@
        const redValue       = Math.floor(scrollPercent * 255);
        menuToggle.style.backgroundColor = `rgb(${redValue}, 0, 0)`;
        menuToggle.style.boxShadow       = 'none';
+
+       // Reveal 光效随进度变化，同时适配日夜间模式
+       const isLight = document.body.classList.contains('light-mode');
+       const t = 1 - scrollPercent; // 顶部 t=1 最亮，底部 t=0 最暗
+       let hiColor, midColor;
+       if (isLight) {
+         // 日间：顶部蓝紫(80,80,180)，底部暗淡(20,20,60)
+         const r  = Math.round(20  + 60  * t);
+         const g  = Math.round(20  + 60  * t);
+         const b  = Math.round(60  + 120 * t);
+         const r2 = Math.round(15  + 45  * t);
+         const b2 = Math.round(50  + 110 * t);
+         hiColor  = `${r}, ${g}, ${b}`;
+         midColor = `${r2}, ${g}, ${b2}`;
+       } else {
+         // 夜间：顶部红(255,0,0)，底部白(255,255,255)
+         const gb   = Math.round(255 * (1 - t));
+         const midR = Math.round(180 * t + 255 * (1 - t));
+         const midGB = Math.round(gb * 0.5);
+         hiColor  = `255, ${gb}, ${gb}`;
+         midColor = `${midR}, ${midGB}, ${midGB}`;
+       }
+       toggleRevealStyle.textContent = `
+         .floating-btn::before {
+           background: radial-gradient(
+             80px circle at var(--rx, -9999px) var(--ry, -9999px),
+             rgba(${hiColor}, 0.95),
+             rgba(${midColor}, 0.45) 45%,
+             transparent 70%
+           );
+         }
+       `;
      }
 
      window.addEventListener('scroll', updateProgress, { passive: true });
@@ -1110,7 +1134,24 @@
              el.style.setProperty('--ry', '-9999px');
              return;
            }
-           const r    = el.getBoundingClientRect();
+           const r = el.getBoundingClientRect();
+
+           // closeBtn 特殊处理：只感应顶边，让光效从上方靠近时有自然衰减
+           if (el === closeBtn) {
+             const topEdgeY = r.top; // 顶边的绝对 Y
+             const dx = Math.max(r.left - e.clientX, 0, e.clientX - r.right);
+             const dy = Math.abs(e.clientY - topEdgeY); // 到顶边的垂直距离
+             const dist = Math.sqrt(dx * dx + dy * dy);
+             if (dist <= range) {
+               el.style.setProperty('--rx', (e.clientX - r.left) + 'px');
+               el.style.setProperty('--ry', (e.clientY - r.top)  + 'px');
+             } else {
+               el.style.setProperty('--rx', '-9999px');
+               el.style.setProperty('--ry', '-9999px');
+             }
+             return;
+           }
+
            const dx   = Math.max(r.left - e.clientX, 0, e.clientX - r.right);
            const dy   = Math.max(r.top  - e.clientY, 0, e.clientY - r.bottom);
            const dist = Math.sqrt(dx * dx + dy * dy);
