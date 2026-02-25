@@ -903,6 +903,9 @@
           isHoverScrolling = true;
           await scrollMenuToItem(item.dataset.id);
 
+          // 居中结束后留 150ms 让残留 pointer 事件消化完毕，状态稳定后再跳转
+          await new Promise(resolve => setTimeout(resolve, 150));
+
           // await 后重新校验：若状态已被其他交互重置则放弃跳转
           if (activeState !== 'hover' || hoveredItem !== item) {
             isHoverScrolling = false;
