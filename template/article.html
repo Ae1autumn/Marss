@@ -864,7 +864,12 @@
 
         // === 状态：scroll ===
         function applyScrollState(id) {
-          if (activeState === 'hover' || activeState === 'menu') return;
+          // 关键修复：即使在hover或menu状态，也更新currentId以保持位置同步
+          // 但只有在scroll状态下才改变视觉高亮和菜单位置
+          if (activeState === 'hover' || activeState === 'menu') {
+            currentId = id; // 保持currentId同步，但不改变视觉状态
+            return;
+          }
           activeState = 'scroll';
           currentId   = id;
           setHighlight(id);
@@ -874,7 +879,6 @@
         function updateActiveHeading() {
           if (allHeadings.length === 0) return;
           if (menuDrivingArticleCount > 0) return;
-          if (isHoverScrolling) return;
           const scrollY = window.scrollY;
           const offset  = 80;
           let current   = allHeadings[0];
@@ -898,27 +902,25 @@
         // === 状态：hover ===
         async function onHoverScrollDebounced(item) {
           if (activeState !== 'hover' || hoveredItem !== item) return;
-          setHighlight(item.dataset.id);
+          // 移除多余的setHighlight(item.dataset.id)调用
+          // 因为在onItemPointerEnter时已经设置过，且我们修复了applyScrollState
+          // 确保在hover状态下即使页面滚动也不会改变视觉高亮
 
           // 先等菜单居中完成，再跳转文章，避免两个 smoothScrollPromise 并发竞争
           isHoverScrolling = true;
           await scrollMenuToItem(item.dataset.id);
-
-          // 居中完成后短暂释放，让浏览器补发的 pointerenter 能进来重新触发防抖
-          // （鼠标静止时 DOM 位移后浏览器会补发，但 isHoverScrolling=true 时会被拦）
-          isHoverScrolling = false;
 
           // 居中结束后留 150ms 让残留 pointer 事件消化完毕，状态稳定后再跳转
           await new Promise(resolve => setTimeout(resolve, 150));
 
           // await 后重新校验：若状态已被其他交互重置则放弃跳转
           if (activeState !== 'hover' || hoveredItem !== item) {
+            isHoverScrolling = false;
             return;
           }
 
           const targetHeading = document.getElementById(item.dataset.id);
           if (targetHeading) {
-            isHoverScrolling = true;
             menuDrivingArticleCount++;
             try {
               await smoothScrollPromise(
