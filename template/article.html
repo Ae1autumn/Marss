@@ -895,20 +895,37 @@
         window.addEventListener('scroll', updateActiveHeading, { passive: true });
 
         // === 状态：hover ===
-        function onHoverScrollDebounced(item) {
+        async function onHoverScrollDebounced(item) {
           if (activeState !== 'hover' || hoveredItem !== item) return;
           setHighlight(item.dataset.id);
-          scrollMenuToItem(item.dataset.id);
+
+          // 先等菜单居中完成，再跳转文章，避免两个 smoothScrollPromise 并发竞争
+          isHoverScrolling = true;
+          await scrollMenuToItem(item.dataset.id);
+
+          // await 后重新校验：若状态已被其他交互重置则放弃跳转
+          if (activeState !== 'hover' || hoveredItem !== item) {
+            isHoverScrolling = false;
+            return;
+          }
 
           const targetHeading = document.getElementById(item.dataset.id);
           if (targetHeading) {
-            isHoverScrolling = true;
-            targetHeading.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            currentId = item.dataset.id;
-            // 等文章滚完再解锁，用轮询判断
-            smoothScrollPromise(() => {}, () => window.scrollY).finally(() => {
+            menuDrivingArticleCount++;
+            try {
+              await smoothScrollPromise(
+                () => targetHeading.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+                () => window.scrollY
+              );
+            } finally {
+              menuDrivingArticleCount--;
               isHoverScrolling = false;
-            });
+              if (activeState === 'hover' && hoveredItem === item) {
+                currentId = item.dataset.id;
+              }
+            }
+          } else {
+            isHoverScrolling = false;
           }
         }
 
