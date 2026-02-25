@@ -816,6 +816,8 @@
         // 滚轮滚动标志：只有真实的 wheel 事件才能设置它
         // 用于屏蔽"元素滑过静止光标"产生的假 pointerenter/pointerleave
         let isWheelScrolling     = false;
+        // hover触发文章滚动期间，同样需要屏蔽假pointer事件
+        let isHoverScrolling     = false;
         // 用计数器替换布尔标志，彻底解决嵌套/并发调用时的竞态问题：
         // 每次程序驱动滚动前 +1，滚动结束后 -1，只有计数为0才视为用户手动滚动。
         let programmaticScrollCount  = 0;
@@ -898,26 +900,34 @@
           setHighlight(item.dataset.id);
           scrollMenuToItem(item.dataset.id);
 
-          // hover 跳转不需要 menuDrivingArticleCount，
-          // 直接跳，让 updateActiveHeading 自然处理 currentId 更新
           const targetHeading = document.getElementById(item.dataset.id);
           if (targetHeading) {
-            currentId = item.dataset.id;
-            targetHeading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            isHoverScrolling = true;
+            menuDrivingArticleCount++;
+            smoothScrollPromise(
+              () => targetHeading.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+              () => window.scrollY
+            ).finally(() => {
+              menuDrivingArticleCount--;
+              isHoverScrolling = false;
+              if (activeState === 'hover' && hoveredItem === item) {
+                currentId = item.dataset.id;
+              }
+            });
           }
         }
 
         function onItemPointerEnter(item) {
-          if (isWheelScrolling) return;
+          if (isWheelScrolling || isHoverScrolling) return;
           hoveredItem = item;
           activeState = 'hover';
-          setHighlight(item.dataset.id);  // 立即高亮
-          hoverScrollDebounce.call(item); // 1.5秒后才居中+跳转
+          setHighlight(item.dataset.id);
+          hoverScrollDebounce.call(item);
         }
 
         function onItemPointerLeave() {
-          if (isWheelScrolling) return;  // 滚轮滚动时忽略假 pointerleave，防止弹回
-          hoverScrollDebounce.cancel(); // 统一在这里取消，不再遗漏
+          if (isWheelScrolling || isHoverScrolling) return;
+          hoverScrollDebounce.cancel();
           hoveredItem = null;
           activeState = 'scroll';
           setHighlight(currentId);
@@ -927,7 +937,7 @@
         if (isDesktop) {
           chapterList.addEventListener('pointerleave', (e) => {
             if (e.pointerType !== 'mouse') return;
-            if (isWheelScrolling) return;  // 滚轮期间飘出去不触发弹回
+            if (isWheelScrolling || isHoverScrolling) return;
             if (activeState === 'hover') onItemPointerLeave();
           });
         }
