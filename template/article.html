@@ -800,9 +800,14 @@
         const hoverScrollDebounce  = createDebounce(onHoverScrollDebounced, 350);
         const menuScrollDebounce   = createDebounce(onMenuScrollDebounced, 400);
         const cooldownDebounce     = createDebounce(() => { isInCooldown = false; }, 5000);
+        // 滚轮停止后 300ms 才解除屏蔽，确保惯性滚动期间假事件全部被过滤
+        const wheelEndDebounce     = createDebounce(() => { isWheelScrolling = false; }, 300);
 
         let isInCooldown         = false;
         let isMenuScrolling      = false;
+        // 滚轮滚动标志：只有真实的 wheel 事件才能设置它
+        // 用于屏蔽"元素滑过静止光标"产生的假 pointerenter/pointerleave
+        let isWheelScrolling     = false;
         // 用计数器替换布尔标志，彻底解决嵌套/并发调用时的竞态问题：
         // 每次程序驱动滚动前 +1，滚动结束后 -1，只有计数为0才视为用户手动滚动。
         let programmaticScrollCount  = 0;
@@ -889,6 +894,7 @@
         }
 
         function onItemPointerEnter(item) {
+          if (isWheelScrolling) return;  // 滚轮滚动时忽略假 pointerenter
           hoveredItem = item;
           activeState = 'hover';
           setHighlight(item.dataset.id);
@@ -899,6 +905,7 @@
         }
 
         function onItemPointerLeave() {
+          if (isWheelScrolling) return;  // 滚轮滚动时忽略假 pointerleave，防止弹回
           hoverScrollDebounce.cancel(); // 统一在这里取消，不再遗漏
           hoveredItem = null;
           activeState = 'scroll';
@@ -909,11 +916,25 @@
         if (isDesktop) {
           chapterList.addEventListener('pointerleave', (e) => {
             if (e.pointerType !== 'mouse') return;
+            if (isWheelScrolling) return;  // 滚轮期间飘出去不触发弹回
             if (activeState === 'hover') onItemPointerLeave();
           });
         }
 
         // === 状态：menu ===
+        // 监听滚轮事件，设置屏蔽标志，防止假 pointer 事件干扰
+        chapterList.addEventListener('wheel', () => {
+          if (!isWheelScrolling) {
+            isWheelScrolling = true;
+            // 如果当前在 hover 状态，立即取消，否则 scroll 事件里 return 掉什么都做不了
+            if (activeState === 'hover') {
+              hoverScrollDebounce.cancel();
+              hoveredItem = null;
+            }
+          }
+          wheelEndDebounce.call();
+        }, { passive: true });
+
         chapterList.addEventListener('scroll', () => {
           if (programmaticScrollCount > 0) return;
           if (activeState === 'hover') return;
