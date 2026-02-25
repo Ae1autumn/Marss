@@ -76,7 +76,6 @@
    
          /* ==================== Reveal ::before 公共结构 ==================== */
          .side-menu-wrapper::before,
-         .menu-left::before,
          .menu-right::before,
          .floating-btn::before {
             content: '';
@@ -273,14 +272,18 @@
             cursor: pointer;
             font-size: 24px;
             z-index: 1000;
-            border: 1px solid rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.12); /* 移动端可见 */
             outline: none;
             background: rgba(20, 20, 20, 0.55);
             backdrop-filter: blur(20px) saturate(180%);
             -webkit-backdrop-filter: blur(20px) saturate(180%);
             transition: background 0.3s ease, border-color 0.3s ease;
          }
-   
+
+         body.is-desktop .floating-btn {
+            border: none;
+         }
+
          body.light-mode .floating-btn {
             background: rgba(255, 255, 255, 0.55);
             border-color: rgba(0, 0, 0, 0.1);
@@ -366,11 +369,11 @@
          }
    
          body.is-desktop .side-menu {
-            border-color: rgba(255, 255, 255, 0.07);
+            border: none;
          }
    
          body.is-desktop.light-mode .side-menu {
-            border-color: rgba(0, 0, 0, 0.05);
+            border: none;
          }
    
          .side-menu.active {
@@ -389,21 +392,7 @@
    
          .menu-left::-webkit-scrollbar { display: none; }
    
-         .menu-left::before {
-            border-radius: 12px 0 0 12px;
-            background: radial-gradient(
-               60px circle at var(--rx, -9999px) var(--ry, -9999px),
-               rgba(var(--reveal-hi),  0.9),
-               rgba(var(--reveal-mid), 0.4) 45%,
-               transparent 70%
-            );
-            opacity: 0;
-         }
-   
-         body.is-desktop .menu-left::before {
-            opacity: 1;
-         }
-   
+
          /* Canvas 叠加层 */
          #menuRevealCanvas {
             position: fixed;
@@ -477,15 +466,18 @@
             border-left-color: rgba(0, 0, 0, 0.1);
          }
    
-         body.is-desktop .menu-right {
-            border-left-color: rgba(255, 255, 255, 0.05);
-         }
-   
+         body.is-desktop .menu-right,
          body.is-desktop.light-mode .menu-right {
-            border-left-color: rgba(0, 0, 0, 0.04);
+            border-left-color: transparent;
          }
    
+         /* Reveal 边框默认隐藏，移动端不显示 */
          .menu-right::before {
+            opacity: 0;
+         }
+
+         body.is-desktop .menu-right::before {
+            opacity: 1;
             border-radius: 0 12px 12px 0;
             background: radial-gradient(
                130px circle at var(--rx, -9999px) var(--ry, -9999px),
@@ -493,13 +485,9 @@
                rgba(var(--reveal-mid), 0.3) 45%,
                transparent 70%
             );
-            opacity: 0;
          }
    
-         body.is-desktop .menu-right::before {
-            opacity: 1;
-         }
-   
+
          .menu-buttons {
             flex: 1;
             display: flex;
@@ -527,7 +515,7 @@
          }
    
          body.light-mode .menu-btn { color: rgba(0, 0, 0, 0.6); }
-         .menu-btn:hover { color: #f00; background-color: rgba(255, 0, 0, 0.1); }
+         body.is-desktop .menu-btn:hover { color: #f00; background-color: rgba(255, 0, 0, 0.1); }
    
          .close-btn {
             position: relative;
@@ -549,17 +537,18 @@
          }
    
          body.is-desktop .close-btn {
-            border-top-color: rgba(255, 255, 255, 0.05);
+            border-top: none;
+            background: transparent;
          }
    
          body.is-desktop.light-mode .close-btn {
-            border-top-color: rgba(0, 0, 0, 0.04);
+            border-top: none;
          }
    
          body.is-desktop .close-btn::before {
             content: '';
             position: absolute;
-            top: -1px;
+            top: 0;
             left: 0;
             right: 0;
             height: 1px;
@@ -573,7 +562,7 @@
             z-index: 3;
          }
    
-         .close-btn:hover { color: #f00; background-color: rgba(255, 0, 0, 0.08); }
+         body.is-desktop .close-btn:hover { color: #f00; background-color: rgba(255, 0, 0, 0.08); }
    
          /* ==================== Reveal：floating-btn ==================== */
          .floating-btn::before {
@@ -811,15 +800,6 @@
         const hoverScrollDebounce  = createDebounce(onHoverScrollDebounced, 350);
         const menuScrollDebounce   = createDebounce(onMenuScrollDebounced, 400);
         const cooldownDebounce     = createDebounce(() => { isInCooldown = false; }, 5000);
-        const backToScrollDebounce = createDebounce(() => {
-          // 菜单滑动后 1.5s 无操作，回归 scroll 状态。
-          // 此时文章已经滚到位，currentId 已是正确值，菜单也在正确位置，
-          // 只需切换状态和高亮，不再调 scrollMenuToItem（否则会用旧 currentId 把菜单拉回去）。
-          if (activeState === 'menu' && !hoveredItem) {
-            activeState = 'scroll';
-            setHighlight(currentId);
-          }
-        }, 1500);
 
         let isInCooldown         = false;
         let isMenuScrolling      = false;
@@ -952,21 +932,33 @@
 
           scrollMenuToItem(centerId).then(() => {
             if (activeState !== 'menu' || hoveredItem) return;
+
+            // currentId 必须在驱动文章前同步，这样无论文章是否真的滚动，
+            // 回归 scroll 状态时用的都是正确的新值，不会跳回旧位置。
+            currentId = centerId;
             setHighlight(centerId);
 
             const targetHeading = document.getElementById(centerId);
             if (targetHeading) {
               menuDrivingArticleCount++;
-              currentId = centerId; // 先同步，防止文章滚完后 backToScrollDebounce 用旧值
               smoothScrollPromise(
                 () => targetHeading.scrollIntoView({ behavior: 'smooth', block: 'start' }),
                 () => window.scrollY
               ).finally(() => {
                 menuDrivingArticleCount--;
+                // 文章滚完（或滚轮场景下位置未变立即完成）后直接回归，
+                // 不再用 backToScrollDebounce 延迟——延迟期间 currentId 可能被
+                // 文章 scroll 事件覆盖成其它值，导致再次跳位。
+                if (activeState === 'menu' && !hoveredItem) {
+                  activeState = 'scroll';
+                  setHighlight(currentId);
+                }
               });
+            } else {
+              // 没有对应标题元素时，直接回归
+              activeState = 'scroll';
+              setHighlight(currentId);
             }
-
-            backToScrollDebounce.call();
           });
         }
 
@@ -1090,9 +1082,8 @@
           const revealTargets = [
             { el: menuToggle,      range: 60,  alwaysOn: true,  distFn: distToRect     },
             { el: sideMenuWrapper, range: 80,  alwaysOn: false, distFn: distToRect     },
-            { el: chapterList,     range: 80,  alwaysOn: false, distFn: distToRect     },
             { el: menuRightEl,     range: 80,  alwaysOn: false, distFn: distToRect     },
-            { el: closeBtn,        range: 80,  alwaysOn: false, distFn: distToTopEdge  }, // 顶边感应
+            { el: closeBtn,        range: 80,  alwaysOn: false, distFn: distToTopEdge  },
           ];
 
           function resizeCanvas() {
