@@ -673,7 +673,7 @@
                   // 움직임 후 멈춤 → 진짜 완료
                   stable++;
                   if (stable >= 3) { resolve(); return; }
-                } else if (now - start > 150) {
+                } else if (now - start > 300) {
                   // 150ms 동안 움직임 없음 → 이미 목적지에 있었던 것
                   resolve(); return;
                 }
@@ -895,6 +895,8 @@
         // === 状态：hover ===
         function onHoverScrollDebounced(item) {
           if (activeState !== 'hover' || hoveredItem !== item) return;
+          setHighlight(item.dataset.id);
+          // 居中和文章跳转同时触发，不串行等待
           scrollMenuToItem(item.dataset.id);
 
           const targetHeading = document.getElementById(item.dataset.id);
@@ -905,7 +907,6 @@
               () => window.scrollY
             ).finally(() => {
               menuDrivingArticleCount--;
-              // 跳转完成后，如果还在hover该item，更新currentId
               if (activeState === 'hover' && hoveredItem === item) {
                 currentId = item.dataset.id;
               }
@@ -917,8 +918,8 @@
           if (isWheelScrolling) return;
           hoveredItem = item;
           activeState = 'hover';
-          setHighlight(item.dataset.id);
-          hoverScrollDebounce.call(item);
+          setHighlight(item.dataset.id);  // 立即高亮
+          hoverScrollDebounce.call(item); // 1.5秒后才居中+跳转
         }
 
         function onItemPointerLeave() {
@@ -1024,10 +1025,7 @@
 
           if (isDesktop) {
             clearAllReveal();
-            // 不管当前是什么状态，关闭时统一清理 hover 相关计时器
             hoverScrollDebounce.cancel();
-            cooldownDebounce.cancel();
-            isInCooldown = false;
             hoveredItem  = null;
             if (activeState === 'hover') {
               activeState = 'scroll';
