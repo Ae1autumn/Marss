@@ -877,7 +877,7 @@
 
         function updateActiveHeading() {
           if (allHeadings.length === 0) return;
-          if (menuDrivingArticleCount > 0) return; // 用计数器判断，更健壮
+          if (menuDrivingArticleCount > 0) return;
           const scrollY = window.scrollY;
           const offset  = 80;
           let current   = allHeadings[0];
@@ -885,6 +885,12 @@
             const top = allHeadings[i].getBoundingClientRect().top + scrollY;
             if (top <= scrollY + offset) current = allHeadings[i];
             else break;
+          }
+          // menu 状态：文章在随用户滚轮滚动，只静默同步 currentId，不改高亮也不拉菜单。
+          // 这样松手回归 scroll 状态时，currentId 已经是最新值，菜单不会跳回旧位置。
+          if (activeState === 'menu') {
+            currentId = current.id;
+            return;
           }
           if (current.id !== currentId || activeState !== 'scroll') {
             applyScrollState(current.id);
@@ -934,10 +940,13 @@
 
         // === 状态：menu ===
         chapterList.addEventListener('scroll', () => {
-          if (programmaticScrollCount > 0) return; // 计数器判断，不误触发
+          if (programmaticScrollCount > 0) return;
           if (activeState === 'hover') return;
           isMenuScrolling = true;
           activeState = 'menu';
+          // 实时更新高亮跟随菜单中心项，而不是等防抖结束后才跳变
+          const realtimeId = getCenteredItemId();
+          if (realtimeId) setHighlight(realtimeId);
           menuScrollDebounce.call();
         }, { passive: true });
 
@@ -947,20 +956,26 @@
           if (!centerId) return;
 
           scrollMenuToItem(centerId).then(() => {
-            // 等滚动真正结束后再做后续操作，彻底解决原来 setTimeout 300ms 的竞态
             if (activeState !== 'menu' || hoveredItem) return;
-            setHighlight(centerId);
 
-            const targetHeading = document.getElementById(centerId);
-            if (targetHeading) {
-              menuDrivingArticleCount++;
-              currentId = centerId;
-              smoothScrollPromise(
-                () => targetHeading.scrollIntoView({ behavior: 'smooth', block: 'start' }),
-                () => window.scrollY
-              ).finally(() => {
-                menuDrivingArticleCount--;
-              });
+            // 对齐高亮到菜单中心项
+            setHighlight(centerId);
+            currentId = centerId;
+
+            // 只有菜单中心项与文章当前位置不一致时，才主动驱动文章滚动。
+            // 用滚轮滚菜单时文章已经同步滚动（currentId 在 updateActiveHeading 里静默更新），
+            // 此时 centerId === currentId，跳过 scrollIntoView，避免重复滚动和抖动。
+            if (centerId !== currentId) {
+              const targetHeading = document.getElementById(centerId);
+              if (targetHeading) {
+                menuDrivingArticleCount++;
+                smoothScrollPromise(
+                  () => targetHeading.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+                  () => window.scrollY
+                ).finally(() => {
+                  menuDrivingArticleCount--;
+                });
+              }
             }
 
             backToScrollDebounce.call();
