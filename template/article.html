@@ -809,11 +809,9 @@
         let activeState = 'scroll';
 
         // 用 createDebounce 替换原来的裸 timer 变量，集中管理
-        const hoverScrollDebounce  = createDebounce(onHoverScrollDebounced, 350);
+        const hoverScrollDebounce  = createDebounce(onHoverScrollDebounced, 1500);
         const menuScrollDebounce   = createDebounce(onMenuScrollDebounced, 400);
-        const cooldownDebounce     = createDebounce(() => { isInCooldown = false; }, 5000);
 
-        let isInCooldown         = false;
         let isMenuScrolling      = false;
         // 滚轮滚动标志：只有真实的 wheel 事件才能设置它
         // 用于屏蔽"元素滑过静止光标"产生的假 pointerenter/pointerleave
@@ -896,21 +894,30 @@
 
         // === 状态：hover ===
         function onHoverScrollDebounced(item) {
-          // 防抖触发时再次检查状态，避免快速移入移出时的幽灵居中
           if (activeState !== 'hover' || hoveredItem !== item) return;
           scrollMenuToItem(item.dataset.id);
-          isInCooldown = true;
-          cooldownDebounce.call(); // 5秒后清除冷却
+
+          const targetHeading = document.getElementById(item.dataset.id);
+          if (targetHeading) {
+            menuDrivingArticleCount++;
+            smoothScrollPromise(
+              () => targetHeading.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+              () => window.scrollY
+            ).finally(() => {
+              menuDrivingArticleCount--;
+              // 跳转完成后，如果还在hover该item，更新currentId
+              if (activeState === 'hover' && hoveredItem === item) {
+                currentId = item.dataset.id;
+              }
+            });
+          }
         }
 
         function onItemPointerEnter(item) {
-          if (isWheelScrolling) return;  // 滚轮滚动时忽略假 pointerenter
+          if (isWheelScrolling) return;
           hoveredItem = item;
           activeState = 'hover';
           setHighlight(item.dataset.id);
-
-          if (isInCooldown) return; // 冷却期内只跟随高亮，不触发居中
-
           hoverScrollDebounce.call(item);
         }
 
