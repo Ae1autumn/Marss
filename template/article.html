@@ -874,6 +874,7 @@
         function updateActiveHeading() {
           if (allHeadings.length === 0) return;
           if (menuDrivingArticleCount > 0) return;
+          if (isHoverScrolling) return;
           const scrollY = window.scrollY;
           const offset  = 80;
           let current   = allHeadings[0];
@@ -903,17 +904,21 @@
           isHoverScrolling = true;
           await scrollMenuToItem(item.dataset.id);
 
+          // 居中完成后短暂释放，让浏览器补发的 pointerenter 能进来重新触发防抖
+          // （鼠标静止时 DOM 位移后浏览器会补发，但 isHoverScrolling=true 时会被拦）
+          isHoverScrolling = false;
+
           // 居中结束后留 150ms 让残留 pointer 事件消化完毕，状态稳定后再跳转
           await new Promise(resolve => setTimeout(resolve, 150));
 
           // await 后重新校验：若状态已被其他交互重置则放弃跳转
           if (activeState !== 'hover' || hoveredItem !== item) {
-            isHoverScrolling = false;
             return;
           }
 
           const targetHeading = document.getElementById(item.dataset.id);
           if (targetHeading) {
+            isHoverScrolling = true;
             menuDrivingArticleCount++;
             try {
               await smoothScrollPromise(
@@ -1127,6 +1132,8 @@
           const canvas = document.getElementById('menuRevealCanvas');
           const ctx    = canvas.getContext('2d');
           let cachedMenuRect = null;
+          let lastMouseX = -9999;
+          let lastMouseY = -9999;
 
           // Reveal 目标列表：每个目标只需声明元素、感应范围、距离策略
           // 新增目标只要在这里加一行即可，handleMove 不需要改动
@@ -1147,12 +1154,20 @@
             cachedMenuRect = r;
           }
 
+          const redrawAfterScroll = createDebounce(() => {
+            if (sideMenuWrapper.classList.contains('active')) {
+              resizeCanvas();
+              drawDividerGlow(lastMouseX, lastMouseY);
+            }
+          }, 150);
+
           chapterList.addEventListener('scroll', () => {
             if (sideMenuWrapper.classList.contains('active')) {
               requestAnimationFrame(() => {
                 resizeCanvas();
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
               });
+              redrawAfterScroll.call();
             }
           }, { passive: true });
 
@@ -1220,6 +1235,8 @@
 
           function handleMove(e) {
             if (e.pointerType && e.pointerType !== 'mouse') return;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
             const menuActive = sideMenuWrapper.classList.contains('active');
 
             // 统一循环处理所有 Reveal 目标，无需为每个目标写特判分支
