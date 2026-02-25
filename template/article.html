@@ -903,16 +903,11 @@
           const targetHeading = document.getElementById(item.dataset.id);
           if (targetHeading) {
             isHoverScrolling = true;
-            menuDrivingArticleCount++;
-            smoothScrollPromise(
-              () => targetHeading.scrollIntoView({ behavior: 'smooth', block: 'start' }),
-              () => window.scrollY
-            ).finally(() => {
-              menuDrivingArticleCount--;
+            targetHeading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            currentId = item.dataset.id;
+            // 等文章滚完再解锁，用轮询判断
+            smoothScrollPromise(() => {}, () => window.scrollY).finally(() => {
               isHoverScrolling = false;
-              if (activeState === 'hover' && hoveredItem === item) {
-                currentId = item.dataset.id;
-              }
             });
           }
         }
