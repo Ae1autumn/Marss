@@ -8,19 +8,102 @@
    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
    <link rel="icon" href="{{ blog.favicon }}">
    <style>
-      /* ==================== 基础样式 ==================== */
-      *, *::before, *::after {
-         box-sizing: border-box;
+      /* ==================== CSS 变量 / 主题 ==================== */
+      /*
+       * 所有颜色统一在这里管理，深色为默认值。
+       * 浅色主题只需在 body.light-mode 中覆盖变量，
+       * 组件样式直接使用 var(--xxx)，无需再写任何 body.dark-mode / body.light-mode 分支。
+       */
+      :root {
+         --bg:              #121212;
+         --color:           #ffffff;
+         --color-muted:     #cccccc;
+         --color-dim:       #999999;
+         --border:          #333333;
+         --tag-bg:          #333333;
+         --tag-color:       #ffffff;
+         --pre-bg:          #2d2d2d;
+         --pre-color:       #f8f8f2;
+         --code-bg:         #3a3a3a;
+         --code-color:      #f8f8f2;
+         --bq-border:       #555555;
+         --bq-bg:           #2a2a2a;
+         --bq-color:        #cccccc;
+         --table-border:    #444444;
+         --table-th-bg:     #333333;
+         --link-color:      #6bb8ff;
+         --link-border:     rgba(107, 184, 255, 0.5);
+         --link-hover-bg:   rgba(107, 184, 255, 0.1);
+         --floating-bg:     #000000;
+         --floating-color:  #ffffff;
+         --menu-bg:         #111111;
+         --menu-border:     #333333;
+         --menu-right-bg:   #222222;
+         --menu-btn-color:  #ffffff;
+         --close-bg:        #222222;
+         --close-color:     #ffffff;
+         --close-border:    #333333;
+         --mask-bg:         rgba(0, 0, 0, 0.5);
+         --chapter-color:   #cccccc;
+         --chapter-h2:      #888888;
+         --chapter-h3:      #666666;
+         --chapter-divider: #222222;
+         --transition:      0.5s ease;
       }
 
-      * {
-         margin: 0;
-         padding: 0;
+      body.light-mode {
+         --bg:              #ffffff;
+         --color:           #000000;
+         --color-muted:     #666666;
+         --color-dim:       #777777;
+         --border:          #dddddd;
+         --tag-bg:          #eeeeee;
+         --tag-color:       #000000;
+         --pre-bg:          #f5f5f5;
+         --pre-color:       #333333;
+         --code-bg:         #f5f5f5;
+         --code-color:      #333333;
+         --bq-border:       #dddddd;
+         --bq-bg:           #f9f9f9;
+         --bq-color:        #666666;
+         --table-border:    #dddddd;
+         --table-th-bg:     #f5f5f5;
+         --link-color:      #4da6ff;
+         --link-border:     rgba(77, 166, 255, 0.5);
+         --link-hover-bg:   rgba(77, 166, 255, 0.1);
+         --floating-bg:     #ffffff;
+         --floating-color:  #000000;
+         --menu-bg:         #ffffff;
+         --menu-border:     #dddddd;
+         --menu-right-bg:   #f5f5f5;
+         --menu-btn-color:  #000000;
+         --close-bg:        #f5f5f5;
+         --close-color:     #000000;
+         --close-border:    #dddddd;
+         --mask-bg:         rgba(0, 0, 0, 0.3);
+         --chapter-color:   #333333;
+         --chapter-h2:      #666666;
+         --chapter-h3:      #999999;
+         --chapter-divider: #eeeeee;
       }
 
+      /* ==================== 基础重置 ==================== */
+      *, *::before, *::after { box-sizing: border-box; }
+      * { margin: 0; padding: 0; }
+
+      /* ==================== 防溢出（统一声明，不再逐处重复） ==================== */
+      .header, .header *,
+      .content, .content *,
+      .menu-left, .chapter-item {
+         word-wrap: break-word;
+         word-break: break-word;
+         overflow-wrap: break-word;
+      }
+
+      /* ==================== Body ==================== */
       body {
-         background-color: #0d0d0d;
-         color: #fff;
+         background-color: var(--bg);
+         color: var(--color);
          font-family: Arial, sans-serif;
          line-height: 1.6;
          padding: 20px;
@@ -28,82 +111,37 @@
          margin: 0 auto;
          position: relative;
          min-height: 200vh;
-         transition: background-color 0.5s ease, color 0.5s ease;
+         transition: background-color var(--transition), color var(--transition);
          overflow-x: hidden;
       }
 
-      /* ==================== 主题样式 ==================== */
-      body.dark-mode {
-         background-color: #121212;
-         color: #ffffff;
-      }
-      
-      body.light-mode {
-         background-color: #fff;
-         color: #000;
-      }
-      
-      body.dark-mode .header { border-bottom-color: #333; }
-      body.dark-mode .title { color: #fff; }
-      body.dark-mode .summary { color: #ccc; }
-      body.dark-mode .date { color: #999; }
-      body.dark-mode .tag { background-color: #333; color: #fff; }
-      body.dark-mode h1, body.dark-mode h2, body.dark-mode h3,
-      body.dark-mode h4, body.dark-mode h5, body.dark-mode h6 {
-         border-bottom-color: #333;
-         color: #fff;
-      }
-      body.dark-mode .comments { border-top-color: #333; }
-
-      body.light-mode .header { border-bottom-color: #ddd; }
-      body.light-mode .title { color: #000; }
-      body.light-mode .summary { color: #666; }
-      body.light-mode .date { color: #777; }
-      body.light-mode .tag { background-color: #eee; color: #000; }
-      body.light-mode h1, body.light-mode h2, body.light-mode h3,
-      body.light-mode h4, body.light-mode h5, body.light-mode h6 {
-         border-bottom-color: #ddd;
-         color: #000;
-      }
-      body.light-mode .comments { border-top-color: #ddd; }
-
-      /* ==================== 文章内容样式 ==================== */
+      /* ==================== 文章头部 ==================== */
       .header {
          margin-bottom: 9px;
-         padding: 20px;
-         padding-bottom: 3px;
-         border-bottom: 1px solid #333;
-         transition: border-color 0.5s ease;
-         word-wrap: break-word;
-         word-break: break-word;
-         overflow-wrap: break-word;
+         padding: 20px 20px 3px;
+         border-bottom: 1px solid var(--border);
+         transition: border-color var(--transition);
       }
 
       .title {
          font-size: 2.5rem;
          margin-bottom: 3px;
-         color: #fff;
-         transition: color 0.5s ease;
-         word-wrap: break-word;
-         word-break: break-word;
-         overflow-wrap: break-word;
+         color: var(--color);
+         transition: color var(--transition);
       }
 
       .summary {
          font-size: 1.1rem;
          margin-bottom: 3px;
-         color: #ccc;
-         transition: color 0.5s ease;
-         word-wrap: break-word;
-         word-break: break-word;
-         overflow-wrap: break-word;
+         color: var(--color-muted);
+         transition: color var(--transition);
       }
 
       .date {
-         color: #999;
+         color: var(--color-dim);
          font-size: 0.9rem;
          margin-bottom: 3px;
-         transition: color 0.5s ease;
+         transition: color var(--transition);
       }
 
       .tags {
@@ -114,44 +152,36 @@
       }
 
       .tag {
-         background-color: #333;
-         color: #fff;
+         background-color: var(--tag-bg);
+         color: var(--tag-color);
          padding: 2px 10px;
          border-radius: 3px;
          font-size: 0.9rem;
-         transition: background-color 0.5s ease, color 0.5s ease;
+         transition: background-color var(--transition), color var(--transition);
       }
 
+      /* ==================== 正文区域 ==================== */
       .content {
-         padding: 20px;
-         padding-top: 0px;
+         padding: 20px 20px 0;
          margin-bottom: 50px;
-         transition: color 0.5s ease;
          overflow-x: hidden;
-         word-wrap: break-word;
-         word-break: break-word;
-         overflow-wrap: break-word;
+         transition: color var(--transition);
       }
 
-      /* ==================== Markdown内容样式 ==================== */
+      /* ==================== Markdown 内容 ==================== */
       .content p {
          margin-top: 0;
          margin-bottom: 0.3em;
          line-height: 1.5;
-         word-wrap: break-word;
-         word-break: break-word;
-         overflow-wrap: break-word;
       }
 
       .content h1, .content h2, .content h3,
       .content h4, .content h5, .content h6 {
          margin: 1.5em 0 0.5em;
          padding-bottom: 10px;
-         border-bottom: 1px solid #333;
-         transition: border-color 0.5s ease, color 0.5s ease;
-         word-wrap: break-word;
-         word-break: break-word;
-         overflow-wrap: break-word;
+         border-bottom: 1px solid var(--border);
+         color: var(--color);
+         transition: border-color var(--transition), color var(--transition);
       }
 
       .content ul, .content ol {
@@ -162,22 +192,18 @@
       .content li {
          margin: 0.3em 0;
          line-height: 1.6;
-         word-wrap: break-word;
-         word-break: break-word;
-         overflow-wrap: break-word;
       }
 
       .content pre {
          margin: 1em 0;
          padding: 1em;
-         background-color: #f5f5f5;
+         background-color: var(--pre-bg);
+         color: var(--pre-color);
          border-radius: 4px;
          overflow-x: auto;
          white-space: pre;
          max-width: 100%;
       }
-
-      body.dark-mode .content pre { background-color: #2d2d2d; color: #f8f8f2; }
 
       .content code {
          font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
@@ -185,29 +211,20 @@
       }
 
       .content p code {
-         background-color: #f5f5f5;
+         background-color: var(--code-bg);
+         color: var(--code-color);
          padding: 0.2em 0.4em;
          border-radius: 3px;
-         word-wrap: break-word;
-         word-break: break-word;
-         overflow-wrap: break-word;
       }
-
-      body.dark-mode .content p code { background-color: #3a3a3a; color: #f8f8f2; }
 
       .content blockquote {
          margin: 1em 0;
          padding: 0.5em 1em;
-         border-left: 4px solid #ddd;
-         background-color: #f9f9f9;
-         color: #666;
+         border-left: 4px solid var(--bq-border);
+         background-color: var(--bq-bg);
+         color: var(--bq-color);
          border-radius: 5px;
-         word-wrap: break-word;
-         word-break: break-word;
-         overflow-wrap: break-word;
       }
-
-      body.dark-mode .content blockquote { border-left-color: #555; background-color: #2a2a2a; color: #ccc; }
 
       .table-wrapper { overflow-x: auto; margin: 20px 0; max-width: 100%; }
 
@@ -219,61 +236,61 @@
       }
 
       .content th, .content td {
-         border: 1px solid #ddd;
+         border: 1px solid var(--table-border);
          padding: 0.5em 1em;
          text-align: left;
-         word-wrap: break-word;
-         word-break: break-word;
-         overflow-wrap: break-word;
          max-width: 300px;
       }
 
-      .content th { background-color: #f5f5f5; font-weight: 600; }
-      body.dark-mode .content th { background-color: #333; border-color: #444; }
-      body.dark-mode .content td { border-color: #444; }
+      .content th {
+         background-color: var(--table-th-bg);
+         font-weight: 600;
+      }
 
-      .content img { max-width: 100%; height: auto; margin: 1em 0; border-radius: 4px; display: block; }
-      .content hr { margin: 2em 0; border: none; border-top: 1px solid #ddd; }
+      .content img {
+         max-width: 100%;
+         height: auto;
+         margin: 1em 0;
+         border-radius: 4px;
+         display: block;
+      }
+
+      .content hr {
+         margin: 2em 0;
+         border: none;
+         border-top: 1px solid var(--border);
+      }
 
       .content a {
-         color: #4da6ff;
+         color: var(--link-color);
          text-decoration: none;
-         border-bottom: 1px dotted rgba(77, 166, 255, 0.5);
+         border-bottom: 1px dotted var(--link-border);
          transition: all 0.3s ease;
-         word-wrap: break-word;
-         word-break: break-word;
-         overflow-wrap: break-word;
       }
-
-      body.dark-mode .content a { color: #6bb8ff; border-bottom: 1px dotted rgba(107, 184, 255, 0.5); }
 
       .content a:hover {
-         color: #fff;
-         border-bottom: 1px solid rgba(77, 166, 255, 0.8);
-         background-color: rgba(77, 166, 255, 0.1);
-      }
-
-      body.dark-mode .content a:hover {
-         color: #fff;
-         border-bottom: 1px solid rgba(107, 184, 255, 0.8);
-         background-color: rgba(107, 184, 255, 0.1);
+         color: var(--color);
+         border-bottom: 1px solid var(--link-border);
+         background-color: var(--link-hover-bg);
       }
 
       /* ==================== 评论区 ==================== */
       .comments {
          margin-top: 50px;
          padding: 20px;
-         border-top: 1px solid #333;
-         transition: border-color 0.5s ease;
+         border-top: 1px solid var(--border);
+         transition: border-color var(--transition);
       }
 
-      /* ==================== 亚克力浮动按钮 ==================== */
+      /* ==================== 悬浮按钮 ==================== */
       .floating-btn {
          position: fixed;
          bottom: 30px;
          right: 30px;
          width: 60px;
          height: 60px;
+         background-color: var(--floating-bg);
+         color: var(--floating-color);
          border-radius: 50%;
          display: flex;
          justify-content: center;
@@ -281,55 +298,33 @@
          cursor: pointer;
          font-size: 24px;
          z-index: 1000;
-         border: 1px solid rgba(255, 255, 255, 0.12);
+         border: none;
          outline: none;
-         /* 亚克力：模糊背景 + 半透明 */
-         background: rgba(20, 20, 20, 0.55);
-         backdrop-filter: blur(20px) saturate(180%);
-         -webkit-backdrop-filter: blur(20px) saturate(180%);
-         transition: background 0.3s ease, border-color 0.3s ease;
+         transition: box-shadow 0.3s ease;
       }
 
-      body.light-mode .floating-btn {
-         background: rgba(255, 255, 255, 0.55);
-         border-color: rgba(0, 0, 0, 0.1);
-         color: #000;
-      }
-
-      /* ==================== 遮罩 ==================== */
-      .menu-mask {
-         position: fixed;
-         top: 0;
-         left: 0;
-         width: 100%;
-         height: 100%;
-         background-color: rgba(0, 0, 0, 0.3);
-         backdrop-filter: blur(2px);
-         -webkit-backdrop-filter: blur(2px);
-         z-index: 998;
-         display: none;
-         transition: opacity 0.3s ease;
-      }
-      .menu-mask.active { display: block; }
-
-      /* ==================== 亚克力侧边菜单 wrapper ==================== */
-      /* wrapper 负责 fixed 定位 + Reveal 发光边框，不受 overflow:hidden 限制 */
-      .side-menu-wrapper {
+      /* ==================== 侧边菜单 ==================== */
+      .side-menu {
          position: fixed;
          bottom: 30px;
          right: 30px;
          width: 250px;
          height: 400px;
-         max-width: calc(100vw - 60px);
-         border-radius: 12px;
-         z-index: 999;
+         background-color: var(--menu-bg);
+         border: 1px solid var(--menu-border);
+         border-radius: 8px;
          display: none;
-         /* pointer-events: none 让点击穿透到 side-menu */
-         pointer-events: none;
+         flex-direction: row;
+         z-index: 999;
+         overflow: hidden;
+         transform-origin: bottom right;
+         transition: background-color var(--transition), border-color var(--transition);
+         max-width: calc(100vw - 60px);
+         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
       }
 
-      .side-menu-wrapper.active {
-         display: block;
+      .side-menu.active {
+         display: flex;
          animation: menuAppear 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55);
       }
 
@@ -338,171 +333,45 @@
          100% { transform: scale(1);   opacity: 1; }
       }
 
-      /* Reveal 边框层挂在 wrapper 上，四边完整 */
-      .side-menu-wrapper::before {
-         content: '';
-         position: absolute;
-         inset: -1px;
-         border-radius: inherit;
-         padding: 1px;
-         background: radial-gradient(
-            150px circle at var(--rx, -9999px) var(--ry, -9999px),
-            rgba(180, 205, 255, 0.95),
-            rgba(108, 143, 255, 0.45) 45%,
-            transparent 70%
-         );
-         -webkit-mask:
-            linear-gradient(#fff 0 0) content-box,
-            linear-gradient(#fff 0 0);
-         -webkit-mask-composite: xor;
-         mask-composite: exclude;
-         pointer-events: none;
-         z-index: 1;
-      }
-
-      /* ==================== 亚克力侧边菜单 ==================== */
-      .side-menu {
-         /* 不再 fixed，由 wrapper 控制位置 */
-         position: relative;
-         width: 100%;
-         height: 100%;
-         border-radius: 12px;
-         display: none;
-         flex-direction: row;
-         overflow: hidden;
-         /* 亚克力 */
-         background: rgba(18, 18, 18, 0.6);
-         backdrop-filter: blur(24px) saturate(180%);
-         -webkit-backdrop-filter: blur(24px) saturate(180%);
-         border: 1px solid rgba(255, 255, 255, 0.1);
-         /* 恢复点击事件 */
-         pointer-events: auto;
-         transition: background 0.5s ease, border-color 0.5s ease;
-      }
-
-      body.light-mode .side-menu {
-         background: rgba(255, 255, 255, 0.6);
-         border-color: rgba(0, 0, 0, 0.08);
-      }
-
-      .side-menu.active {
-         display: flex;
-      }
-
-      /* ==================== 菜单左侧：章节列表 ==================== */
       .menu-left {
-         position: relative;
          width: 200px;
          padding: 20px;
          overflow-y: auto;
          scrollbar-width: none;
-         /* 亚克力底色透明，让父级模糊透过 */
-         background: transparent;
-         word-wrap: break-word;
-         word-break: break-word;
-         overflow-wrap: break-word;
+         background-color: var(--menu-bg);
+         transition: background-color var(--transition);
       }
-
       .menu-left::-webkit-scrollbar { display: none; }
 
-      /* menu-left 的 Reveal 发光 */
-      /* 半径缩小到 60px：只照亮鼠标附近的边框，不穿透相邻 item 间隙 */
-      /* ::before 挂在自身上，不受 overflow-y:auto 裁剪，外侧边也能触发 */
-      .menu-left::before {
-         content: '';
-         position: absolute;
-         inset: -1px;
-         border-radius: 12px 0 0 12px;
-         padding: 1px;
-         background: radial-gradient(
-            60px circle at var(--rx, -9999px) var(--ry, -9999px),
-            rgba(180, 205, 255, 0.9),
-            rgba(108, 143, 255, 0.4) 45%,
-            transparent 70%
-         );
-         -webkit-mask:
-            linear-gradient(#fff 0 0) content-box,
-            linear-gradient(#fff 0 0);
-         -webkit-mask-composite: xor;
-         mask-composite: exclude;
-         pointer-events: none;
-         z-index: 2;
-      }
-
-      /* 章节项之间的分隔线光效：挂在每个 item 自身的 border-bottom 上 */
-      /* 用 outline 模拟底部边框发光，不受 overflow 裁剪 */
       .chapter-item {
          padding: 10px 0;
-         border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+         border-bottom: 1px solid var(--chapter-divider);
          cursor: pointer;
-         color: rgba(255, 255, 255, 0.7);
+         color: var(--chapter-color);
          transition: color 0.2s, padding-left 0.2s;
-         word-wrap: break-word;
-         word-break: break-word;
-         overflow-wrap: break-word;
-         position: relative;
       }
 
-      body.light-mode .chapter-item {
-         border-bottom-color: rgba(0, 0, 0, 0.08);
-         color: rgba(0, 0, 0, 0.7);
-      }
-
+      /* 层级缩进 */
       .chapter-item.h1-item { padding-left: 0; }
-      .chapter-item.h2-item { padding-left: 14px; color: rgba(255,255,255,0.45); font-size: 0.9em; }
-      .chapter-item.h3-item { padding-left: 28px; color: rgba(255,255,255,0.3);  font-size: 0.85em; }
+      .chapter-item.h2-item { padding-left: 14px; color: var(--chapter-h2); font-size: 0.9em; }
+      .chapter-item.h3-item { padding-left: 28px; color: var(--chapter-h3); font-size: 0.85em; }
 
-      body.light-mode .chapter-item.h2-item { color: rgba(0,0,0,0.45); }
-      body.light-mode .chapter-item.h3-item { color: rgba(0,0,0,0.3); }
+      .chapter-item:hover            { color: #f00; }
+      .chapter-item.h1-item:hover    { padding-left: 5px; }
+      .chapter-item.h2-item:hover    { padding-left: 19px; }
+      .chapter-item.h3-item:hover    { padding-left: 33px; }
 
-      /* 红色 hover 保留 */
-      .chapter-item:hover { color: #f00; }
-      .chapter-item.h1-item:hover { padding-left: 5px; }
-      .chapter-item.h2-item:hover { padding-left: 19px; }
-      .chapter-item.h3-item:hover { padding-left: 33px; }
-      /* current：滚动追踪高亮 */
-      .chapter-item.current { color: red !important; }
-      /* hovered：鼠标悬停时覆盖 current，同一时间只有一个高亮 */
+      /* 当前/悬停高亮（同一时间只有一个生效，由 JS 控制） */
+      .chapter-item.current,
       .chapter-item.hovered { color: red !important; }
 
-      /* ==================== 菜单右侧：按钮区 ==================== */
       .menu-right {
-         position: relative;
          width: 50px;
          height: 100%;
          display: flex;
          flex-direction: column;
-         /* 亚克力分隔感：稍深一点的半透明 */
-         background: rgba(0, 0, 0, 0.2);
-         border-left: 1px solid rgba(255, 255, 255, 0.07);
-         transition: background 0.5s ease;
-      }
-
-      body.light-mode .menu-right {
-         background: rgba(0, 0, 0, 0.05);
-         border-left-color: rgba(0, 0, 0, 0.06);
-      }
-
-      /* menu-right 的 Reveal 发光 */
-      .menu-right::before {
-         content: '';
-         position: absolute;
-         inset: -1px;
-         border-radius: 0 12px 12px 0;
-         padding: 1px;
-         background: radial-gradient(
-            130px circle at var(--rx, -9999px) var(--ry, -9999px),
-            rgba(180, 205, 255, 0.7),
-            rgba(108, 143, 255, 0.3) 45%,
-            transparent 70%
-         );
-         -webkit-mask:
-            linear-gradient(#fff 0 0) content-box,
-            linear-gradient(#fff 0 0);
-         -webkit-mask-composite: xor;
-         mask-composite: exclude;
-         pointer-events: none;
-         z-index: 2;
+         background-color: var(--menu-right-bg);
+         transition: background-color var(--transition);
       }
 
       .menu-buttons {
@@ -516,78 +385,56 @@
          margin-left: 1px;
       }
 
-      /* 红色按钮保留 */
       .menu-btn {
-         color: rgba(255, 255, 255, 0.75);
+         color: var(--menu-btn-color);
          background: none;
          border: none;
          cursor: pointer;
-         transition: all 0.2s;
          font-size: 20px;
          width: 47px;
          height: 47px;
-         text-align: center;
          border-radius: 5px;
          display: flex;
          justify-content: center;
          align-items: center;
+         transition: color 0.2s, background-color 0.2s;
       }
-
-      body.light-mode .menu-btn { color: rgba(0, 0, 0, 0.6); }
       .menu-btn:hover { color: #f00; background-color: rgba(255, 0, 0, 0.1); }
 
       .close-btn {
          height: 50px;
-         background: rgba(0, 0, 0, 0.15);
-         color: rgba(255, 255, 255, 0.6);
+         background-color: var(--close-bg);
+         color: var(--close-color);
          border: none;
-         border-top: 1px solid rgba(255, 255, 255, 0.07);
+         border-top: 1px solid var(--close-border);
          cursor: pointer;
          font-size: 16px;
-         transition: background 0.2s, color 0.2s;
          width: 100%;
          margin-left: 1px;
+         transition: background-color 0.2s;
       }
 
-      body.light-mode .close-btn {
-         background: rgba(0, 0, 0, 0.04);
-         color: rgba(0, 0, 0, 0.5);
-         border-top-color: rgba(0, 0, 0, 0.06);
+      .menu-mask {
+         position: fixed;
+         top: 0; left: 0;
+         width: 100%; height: 100%;
+         background-color: var(--mask-bg);
+         z-index: 998;
+         display: none;
+         transition: background-color var(--transition);
       }
-
-      .close-btn:hover { color: #f00; background-color: rgba(255, 0, 0, 0.08); }
-
-      /* ==================== Reveal：floating-btn ==================== */
-      .floating-btn::before {
-         content: '';
-         position: absolute;
-         inset: -1px;
-         border-radius: 50%;
-         padding: 1px;
-         background: radial-gradient(
-            80px circle at var(--rx, -9999px) var(--ry, -9999px),
-            rgba(180, 205, 255, 0.95),
-            rgba(108, 143, 255, 0.45) 45%,
-            transparent 70%
-         );
-         -webkit-mask:
-            linear-gradient(#fff 0 0) content-box,
-            linear-gradient(#fff 0 0);
-         -webkit-mask-composite: xor;
-         mask-composite: exclude;
-         pointer-events: none;
-      }
+      .menu-mask.active { display: block; }
 
       .header, .floating-btn, .side-menu, .comments {
          user-select: none;
          -webkit-user-select: none;
          -webkit-touch-callout: none;
       }
-      
    </style>
 </head>
 
 <body class="{% if blog.theme.mode == 'light' %}light-mode{% else %}dark-mode{% endif %}">
+
    <div class="header">
       <h1 class="title">{{ article.title | default('') }}</h1>
       <p class="summary">{{ article.summary }}</p>
@@ -605,259 +452,198 @@
 
    <div class="comments"></div>
 
-   <button class="floating-btn" id="menuToggle" style="color: #fff">☰</button>
+   <button class="floating-btn" id="menuToggle">☰</button>
 
    <div class="menu-mask" id="menuMask"></div>
 
-   <!-- wrapper 负责 fixed 定位和 Reveal 外框，side-menu 负责内容和亚克力 -->
-   <div class="side-menu-wrapper" id="sideMenuWrapper">
-      <div class="side-menu" id="sideMenu">
-         <div class="menu-left" id="chapterList"></div>
-         <div class="menu-right">
-            <div class="menu-buttons">
-               <button class="menu-btn" id="toBottomBtn">▼</button>
-               <button class="menu-btn" id="middleBtn">◎</button>
-               <button class="menu-btn" id="toTopBtn">▲</button>
-            </div>
-            <button class="close-btn" id="closeBtn">╳</button>
+   <div class="side-menu" id="sideMenu">
+      <div class="menu-left" id="chapterList"></div>
+      <div class="menu-right">
+         <div class="menu-buttons">
+            <button class="menu-btn" id="toBottomBtn">▼</button>
+            <button class="menu-btn" id="middleBtn">◎</button>
+            <button class="menu-btn" id="toTopBtn">▲</button>
          </div>
+         <button class="close-btn" id="closeBtn">╳</button>
       </div>
    </div>
 
    <script>
-     const menuToggle     = document.getElementById('menuToggle');
-     const sideMenuWrapper= document.getElementById('sideMenuWrapper');
-     const sideMenu       = document.getElementById('sideMenu');
-     const menuMask       = document.getElementById('menuMask');
-     const closeBtn       = document.getElementById('closeBtn');
-     const toBottomBtn    = document.getElementById('toBottomBtn');
-     const middleBtn      = document.getElementById('middleBtn');
-     const toTopBtn       = document.getElementById('toTopBtn');
-     const chapterList    = document.getElementById('chapterList');
-     const menuLeftEl     = document.querySelector('.menu-left');
-     const menuRightEl    = document.querySelector('.menu-right');
+     /* ================================================================
+      * 1. 主题初始化
+      *    仅在 localStorage 存有用户偏好时才覆盖服务端渲染的 class，
+      *    避免与 Jinja2 初始 class 发生双重冲突。
+      * ================================================================ */
+     (function initTheme() {
+       const saved = localStorage.getItem('theme');
+       if (!saved) return;
+       document.body.classList.toggle('light-mode', saved === 'light');
+       document.body.classList.toggle('dark-mode', saved !== 'light');
+     })();
 
-     // === 1. 收集 h1/h2/h3，生成唯一 ID ===
-     const allHeadings = Array.from(
-       document.querySelectorAll('.content h1, .content h2, .content h3')
-     ).filter(h => h.textContent.trim() !== '');
 
-     allHeadings.forEach((el, index) => {
-       el.id = `heading-${index}`;
-     });
+     /* ================================================================
+      * 2. 章节导航模块（封装为独立函数，方便其他页面复用）
+      *
+      *    用法：
+      *      const nav = initChapterNav({ contentSel, listEl, offset });
+      *      nav.updateActive()       —— 更新当前高亮
+      *      nav.scrollListToItem(id) —— 让列表滚动到指定项
+      *      nav.getCurrentId()       —— 获取当前高亮的标题 ID
+      * ================================================================ */
+     function initChapterNav({ contentSel = '.content', listEl, offset = 80 } = {}) {
+       // 收集标题并分配唯一 ID
+       const headings = Array.from(
+         document.querySelectorAll(`${contentSel} h1, ${contentSel} h2, ${contentSel} h3`)
+       ).filter(h => h.textContent.trim() !== '');
 
-     // === 2. 应用主题 ===
-     function applyTheme() {
-       const savedTheme  = localStorage.getItem('theme');
-       const configTheme = "{{ blog.theme.mode }}";
-       const mode = savedTheme || configTheme;
-       document.body.classList.toggle('light-mode', mode === 'light');
-       document.body.classList.toggle('dark-mode',  mode !== 'light');
-     }
-     applyTheme();
+       headings.forEach((el, i) => { el.id = `heading-${i}`; });
 
-     // === 3. 生成章节导航 ===
-     allHeadings.forEach(heading => {
-       const listItem  = document.createElement('div');
-       const level     = parseInt(heading.tagName.substring(1));
-       const classMap  = { 1: 'h1-item', 2: 'h2-item', 3: 'h3-item' };
-       listItem.className   = `chapter-item ${classMap[level] || 'h1-item'}`;
-       listItem.textContent = heading.textContent;
-       listItem.dataset.id  = heading.id;
+       // 高亮状态
+       let currentId   = null;
+       let hoveredItem = null;
 
-       listItem.addEventListener('click', (e) => {
-         e.stopPropagation();
-         heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
-         closeMenu();
-       });
+       function refreshHighlight() {
+         listEl.querySelectorAll('.chapter-item.current, .chapter-item.hovered')
+           .forEach(i => i.classList.remove('current', 'hovered'));
+         if (hoveredItem) {
+           hoveredItem.classList.add('hovered');
+         } else {
+           const item = listEl.querySelector(`.chapter-item[data-id="${currentId}"]`);
+           if (item) item.classList.add('current');
+         }
+       }
 
-       // hover 高亮：覆盖 current，离开后恢复
-       listItem.addEventListener('mouseenter', () => {
-         hoveredItem = listItem;
+       function scrollListToItem(id) {
+         const item = listEl.querySelector(`.chapter-item[data-id="${id}"]`);
+         if (!item || listEl.scrollHeight <= listEl.clientHeight) return;
+         const target = item.offsetTop - (listEl.clientHeight - item.offsetHeight) / 2;
+         listEl.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+       }
+
+       function setActive(id) {
+         currentId = id;
          refreshHighlight();
+       }
+
+       // 渲染章节列表
+       const classMap = { 1: 'h1-item', 2: 'h2-item', 3: 'h3-item' };
+       headings.forEach(heading => {
+         const item  = document.createElement('div');
+         const level = parseInt(heading.tagName[1]);
+         item.className   = `chapter-item ${classMap[level] || 'h1-item'}`;
+         item.textContent = heading.textContent;
+         item.dataset.id  = heading.id;
+
+         item.addEventListener('click', e => {
+           e.stopPropagation();
+           heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+           closeMenu();
+         });
+         item.addEventListener('mouseenter', () => { hoveredItem = item; refreshHighlight(); });
+         item.addEventListener('mouseleave', () => { hoveredItem = null; refreshHighlight(); });
+
+         listEl.appendChild(item);
        });
-       listItem.addEventListener('mouseleave', () => {
-         hoveredItem = null;
-         refreshHighlight();
-       });
 
-       chapterList.appendChild(listItem);
-     });
-
-     // === 4. 高亮 & 进度追踪 ===
-     let currentId   = null;
-     let hoveredItem = null; // 当前鼠标悬停的 chapter-item
-
-     function refreshHighlight() {
-       document.querySelectorAll('.chapter-item.current, .chapter-item.hovered')
-         .forEach(i => i.classList.remove('current', 'hovered'));
-       if (hoveredItem) {
-         // 有 hover：只显示 hover 高亮，压制 current
-         hoveredItem.classList.add('hovered');
-       } else {
-         // 无 hover：恢复 current 高亮
-         const item = document.querySelector(`.chapter-item[data-id="${currentId}"]`);
-         if (item) item.classList.add('current');
-       }
-     }
-
-     function setActiveItem(id) {
-       currentId = id;
-       refreshHighlight();
-     }
-
-     function scrollMenuToItem(id) {
-       const item = document.querySelector(`.chapter-item[data-id="${id}"]`);
-       if (!item) return;
-       const container       = chapterList;
-       const itemTop         = item.offsetTop;
-       const itemHeight      = item.offsetHeight;
-       const containerHeight = container.clientHeight;
-       const scrollTarget    = itemTop - (containerHeight - itemHeight) / 2;
-       if (container.scrollHeight > containerHeight) {
-         container.scrollTo({ top: Math.max(0, scrollTarget), behavior: 'smooth' });
-       }
-     }
-
-     function updateActiveHeading() {
-       if (allHeadings.length === 0) return;
-       const scrollY = window.scrollY;
-       const offset  = 80;
-       let current   = allHeadings[0];
-
-       for (let i = 0; i < allHeadings.length; i++) {
-         const top = allHeadings[i].getBoundingClientRect().top + scrollY;
-         if (top <= scrollY + offset) current = allHeadings[i];
-         else break;
+       // 滚动追踪当前标题
+       function updateActive() {
+         if (!headings.length) return;
+         const scrollY = window.scrollY;
+         let current = headings[0];
+         for (const h of headings) {
+           if (h.getBoundingClientRect().top + scrollY <= scrollY + offset) current = h;
+           else break;
+         }
+         if (current.id !== currentId) {
+           setActive(current.id);
+           scrollListToItem(current.id);
+         }
        }
 
-       if (current.id !== currentId) {
-         currentId = current.id;
-         setActiveItem(currentId);
-         scrollMenuToItem(currentId);
-       }
+       // 初始高亮第一项
+       if (headings.length) { currentId = headings[0].id; setActive(currentId); }
+
+       return { updateActive, scrollListToItem, getCurrentId: () => currentId };
      }
 
-     if (allHeadings.length > 0) {
-       currentId = allHeadings[0].id;
-       setActiveItem(currentId);
-     }
 
-     window.addEventListener('scroll', updateActiveHeading, { passive: true });
+     /* ================================================================
+      * 3. 菜单控制
+      * ================================================================ */
+     const menuToggle  = document.getElementById('menuToggle');
+     const sideMenu    = document.getElementById('sideMenu');
+     const menuMask    = document.getElementById('menuMask');
+     const closeBtn    = document.getElementById('closeBtn');
+     const toBottomBtn = document.getElementById('toBottomBtn');
+     const middleBtn   = document.getElementById('middleBtn');
+     const toTopBtn    = document.getElementById('toTopBtn');
+     const chapterList = document.getElementById('chapterList');
 
-     // === 5. 菜单控制 ===
+     const nav = initChapterNav({ listEl: chapterList });
+
      function openMenu() {
-       sideMenuWrapper.classList.add('active');
        sideMenu.classList.add('active');
        menuMask.classList.add('active');
        menuToggle.style.display = 'none';
-       if (currentId) scrollMenuToItem(currentId);
+       nav.scrollListToItem(nav.getCurrentId());
      }
 
      function closeMenu() {
-       sideMenuWrapper.classList.remove('active');
        sideMenu.classList.remove('active');
        menuMask.classList.remove('active');
        menuToggle.style.display = 'flex';
      }
 
-     menuToggle.addEventListener('click',  (e) => { e.stopPropagation(); openMenu(); });
-     closeBtn.addEventListener('click',    (e) => { e.stopPropagation(); closeMenu(); });
-     menuMask.addEventListener('click',    (e) => { e.stopPropagation(); closeMenu(); });
-     sideMenu.addEventListener('click',    (e) => e.stopPropagation());
+     menuToggle.addEventListener('click',  e => { e.stopPropagation(); openMenu(); });
+     closeBtn.addEventListener('click',    e => { e.stopPropagation(); closeMenu(); });
+     menuMask.addEventListener('click',    e => { e.stopPropagation(); closeMenu(); });
+     sideMenu.addEventListener('click',    e => e.stopPropagation());
 
-     toBottomBtn.addEventListener('click', (e) => {
+     toBottomBtn.addEventListener('click', e => {
        e.stopPropagation();
        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
        closeMenu();
      });
-
-     middleBtn.addEventListener('click', (e) => {
+     middleBtn.addEventListener('click', e => {
        e.stopPropagation();
-       const middle = (document.documentElement.scrollHeight - window.innerHeight) / 2;
-       window.scrollTo({ top: middle, behavior: 'smooth' });
+       window.scrollTo({
+         top: (document.documentElement.scrollHeight - window.innerHeight) / 2,
+         behavior: 'smooth'
+       });
        closeMenu();
      });
-
-     toTopBtn.addEventListener('click', (e) => {
+     toTopBtn.addEventListener('click', e => {
        e.stopPropagation();
        window.scrollTo({ top: 0, behavior: 'smooth' });
        closeMenu();
      });
 
-     // === 6. 滚动进度指示器 ===
+
+     /* ================================================================
+      * 4. 滚动进度指示器
+      * ================================================================ */
      function updateProgress() {
-       const scrollHeight   = document.documentElement.scrollHeight - window.innerHeight;
-       const scrollPosition = window.scrollY;
-       const scrollPercent  = scrollHeight > 0 ? Math.min(scrollPosition / scrollHeight, 1) : 0;
-       const redValue       = Math.floor(scrollPercent * 255);
-       menuToggle.style.backgroundColor = `rgba(${redValue}, 0, 0, 0.55)`;
-       menuToggle.style.boxShadow       = `0 4px 12px rgba(${redValue}, 0, 0, 0.3)`;
+       const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+       const pct       = maxScroll > 0 ? Math.min(window.scrollY / maxScroll, 1) : 0;
+       const r         = Math.floor(pct * 255);
+       menuToggle.style.backgroundColor = `rgb(${r}, 0, 0)`;
+       menuToggle.style.boxShadow       = `0 4px 12px rgba(${r}, 0, 0, 0.3)`;
      }
 
-     window.addEventListener('scroll', updateProgress, { passive: true });
+
+     /* ================================================================
+      * 5. 合并 scroll 监听（原来绑定了两次，现在合并为一次回调）
+      * ================================================================ */
+     window.addEventListener('scroll', () => {
+       nav.updateActive();
+       updateProgress();
+     }, { passive: true });
+
      window.addEventListener('resize', updateProgress, { passive: true });
+
      updateProgress();
-
-     // ==================== Reveal Highlight ====================
-     // 仅桌面端生效：移动端没有悬停概念，跳过所有光效逻辑
-     const isDesktop = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
-
-     if (isDesktop) {
-
-     const revealTargets = [
-       { el: menuToggle,       range: 60,  alwaysOn: true  },
-       { el: sideMenuWrapper,  range: 80,  alwaysOn: false },
-       { el: menuLeftEl,       range: 80,  alwaysOn: false },
-       { el: menuRightEl,      range: 80,  alwaysOn: false },
-     ];
-
-     function clearAllReveal() {
-       revealTargets.forEach(({ el }) => {
-         el?.style.setProperty('--rx', '-9999px');
-         el?.style.setProperty('--ry', '-9999px');
-       });
-     }
-
-     function handleMove(e) {
-       if (e.pointerType && e.pointerType !== 'mouse') return;
-
-       revealTargets.forEach(({ el, range, alwaysOn }) => {
-         if (!el) return;
-         if (!alwaysOn && !sideMenuWrapper.classList.contains('active')) {
-           el.style.setProperty('--rx', '-9999px');
-           el.style.setProperty('--ry', '-9999px');
-           return;
-         }
-         const r    = el.getBoundingClientRect();
-         const dx   = Math.max(r.left - e.clientX, 0, e.clientX - r.right);
-         const dy   = Math.max(r.top  - e.clientY, 0, e.clientY - r.bottom);
-         const dist = Math.sqrt(dx * dx + dy * dy);
-         if (dist <= range) {
-           // menu-left 有 overflow-y:auto，::before 的坐标系是整个 scrollable 区域
-           // 需要加上 scrollTop 修正，让发光跟随鼠标而不是滚动内容
-           const scrollCorrection = (el === menuLeftEl) ? el.scrollTop : 0;
-           el.style.setProperty('--rx', (e.clientX - r.left) + 'px');
-           el.style.setProperty('--ry', (e.clientY - r.top + scrollCorrection) + 'px');
-         } else {
-           el.style.setProperty('--rx', '-9999px');
-           el.style.setProperty('--ry', '-9999px');
-         }
-       });
-     }
-
-     document.addEventListener('pointermove',  handleMove);
-     document.addEventListener('mousemove',    handleMove);
-     document.addEventListener('pointerup',    handleMove);
-     document.addEventListener('mouseup',      handleMove);
-     document.addEventListener('pointerleave', clearAllReveal);
-     document.addEventListener('mouseleave',   clearAllReveal);
-     window.addEventListener('blur',           clearAllReveal);
-
-     } // end isDesktop
-
    </script>
 
 </body>
-
 </html>
