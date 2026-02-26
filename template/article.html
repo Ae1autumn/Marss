@@ -180,7 +180,8 @@
             max-width: 100%;
          }
    
-         body.dark-mode .content pre { background-color: #2d2d2d; color: #f8f8f2; }
+         body.dark-mode  .content pre { background-color: #2d2d2d; color: #f8f8f2; }
+         body.light-mode .content pre { background-color: #f5f5f5; color: #333; }
    
          .content code {
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
@@ -752,7 +753,7 @@
           const mode        = savedTheme || configTheme;
           document.body.classList.toggle('light-mode', mode === 'light');
           document.body.classList.toggle('dark-mode',  mode !== 'light');
-          menuToggle.style.color = mode === 'light' ? '#000' : '#fff';
+
         }
         applyTheme();
 
@@ -1238,13 +1239,13 @@
           document.addEventListener('pointerleave', clearAllReveal);
           window.addEventListener('blur',           clearAllReveal);
 
-          window.addEventListener('resize', () => {
+          function handleResize() {
             cachedMenuRect  = null;
             cachedItemRects = null;
             resizeCanvas();
-          });
+          }
 
-          return { resizeCanvas, clearAllReveal };
+          return { resizeCanvas, clearAllReveal, handleResize };
         }
 
 
@@ -1297,8 +1298,11 @@
           });
         }
 
-        // resize 同步进度条颜色（原版即为无条件，移动端也需要）
-        window.addEventListener('resize', updateProgress, { passive: true });
+        // resize 同步进度条颜色 + canvas 尺寸（合并为单一监听器，桌面/移动端均生效）
+        window.addEventListener('resize', () => {
+          if (reveal) reveal.handleResize();
+          updateProgress();
+        }, { passive: true });
 
         // --- 按钮事件 ---
         menuToggle.addEventListener('click',  (e) => { e.stopPropagation(); openMenu(); });
