@@ -597,7 +597,7 @@
    
       <div class="comments"></div>
    
-      <button class="floating-btn" id="menuToggle" style="color: #fff">☰</button>
+      <button class="floating-btn" id="menuToggle">☰</button>
    
       <div class="menu-mask" id="menuMask"></div>
    
@@ -618,16 +618,11 @@
       <canvas id="menuRevealCanvas"></canvas>
    
       <script>
-        // ==================== 工具函数 ====================
+        // ==================== 1. 工具函数 ====================
 
         /**
          * 通用防抖函数
-         * @param {Function} fn - 要防抖的函数
-         * @param {number} delay - 延迟毫秒数
-         * @returns 防抖控制器对象，包含 call / cancel / pending 三个属性
-         *
-         * 使用对象而非直接返回函数，是为了在需要时能精确 cancel，
-         * 避免原始代码里到处 clearTimeout(someTimer) 的散乱写法。
+         * 返回对象而非函数，方便在需要时精确 cancel。
          */
         function createDebounce(fn, delay) {
           let timer = null;
@@ -636,50 +631,33 @@
               clearTimeout(timer);
               timer = setTimeout(() => { timer = null; fn(...args); }, delay);
             },
-            cancel() {
-              clearTimeout(timer);
-              timer = null;
-            },
+            cancel() { clearTimeout(timer); timer = null; },
             get pending() { return timer !== null; }
           };
         }
 
         /**
-         * 基于 Promise 的 smooth scroll 完成检测
-         * 通过轮询位置变化判断滚动是否结束，解决原代码中硬编码超时的竞态问题。
-         * @param {HTMLElement} el - 被滚动的元素（window 传 document.documentElement）
-         * @param {Function} scrollFn - 触发滚动的函数
-         * @param {number} timeout - 最长等待时间（兜底）
+         * 基于 Promise 的 smooth scroll 完成检测。
+         * 轮询位置变化判断滚动结束，避免硬编码超时的竞态。
          */
         function smoothScrollPromise(scrollFn, getPosition, timeout = 1000) {
           return new Promise(resolve => {
             scrollFn();
             let lastPos = getPosition();
-            let stable = 0;
-            let animationStarted = false;  // 실제로 움직임이 감지됐는지
-            const start = performance.now();
+            let stable  = 0;
+            let started = false;
+            const t0 = performance.now();
 
             function check() {
               const now = performance.now();
               const pos = getPosition();
-
               if (pos !== lastPos) {
-                // 애니메이션이 실제로 시작됨
-                animationStarted = true;
-                stable = 0;
-                lastPos = pos;
+                started = true; stable = 0; lastPos = pos;
               } else {
-                if (animationStarted) {
-                  // 움직임 후 멈춤 → 진짜 완료
-                  stable++;
-                  if (stable >= 3) { resolve(); return; }
-                } else if (now - start > 300) {
-                  // 150ms 동안 움직임 없음 → 이미 목적지에 있었던 것
-                  resolve(); return;
-                }
+                if (started) { if (++stable >= 3) { resolve(); return; } }
+                else if (now - t0 > 300) { resolve(); return; }
               }
-
-              if (now - start > timeout) { resolve(); return; }
+              if (now - t0 > timeout) { resolve(); return; }
               requestAnimationFrame(check);
             }
             requestAnimationFrame(check);
@@ -687,8 +665,8 @@
         }
 
         /**
-         * 计算点到矩形的距离（点在矩形内时为0）
-         * 所有 Reveal 元素的距离判断都用这一个函数，消除重复逻辑。
+         * 点到矩形的距离（点在矩形内时为 0）。
+         * 所有 Reveal 元素的距离判断共用这一个函数。
          */
         function distToRect(mouseX, mouseY, rect) {
           const dx = Math.max(rect.left - mouseX, 0, mouseX - rect.right);
@@ -697,7 +675,7 @@
         }
 
         /**
-         * 计算点到矩形顶边的距离（closeBtn 专用：只感应顶边）
+         * 点到矩形顶边的距离（closeBtn 专用：只感应顶边）。
          */
         function distToTopEdge(mouseX, mouseY, rect) {
           const dx = Math.max(rect.left - mouseX, 0, mouseX - rect.right);
@@ -705,14 +683,7 @@
           return Math.sqrt(dx * dx + dy * dy);
         }
 
-        /**
-         * 更新单个 Reveal 元素的 CSS 变量
-         * @param {HTMLElement} el
-         * @param {number} mouseX
-         * @param {number} mouseY
-         * @param {number} range - 感应半径
-         * @param {Function} distFn - 距离计算策略，默认 distToRect
-         */
+        /** 更新单个 Reveal 元素的 CSS 变量。 */
         function updateRevealVar(el, mouseX, mouseY, range, distFn = distToRect) {
           if (!el) return;
           const r    = el.getBoundingClientRect();
@@ -726,27 +697,15 @@
           }
         }
 
-        /**
-         * 清除单个元素的 Reveal 变量
-         */
+        /** 清除单个元素的 Reveal 变量。 */
         function clearRevealVar(el) {
           if (!el) return;
           el.style.setProperty('--rx', '-9999px');
           el.style.setProperty('--ry', '-9999px');
         }
 
-        /**
-         * 主动查询当前鼠标位置下是否有 chapter-item
-         * 用于在 DOM 位移后不依赖浏览器补发的 pointer 事件，直接决策
-         */
-        function getItemAtPointer() {
-          const el = document.elementFromPoint(lastMouseX, lastMouseY);
-          if (!el) return null;
-          return el.closest('.chapter-item');
-        }
 
-
-        // ==================== DOM 引用 ====================
+        // ==================== 2. DOM 引用 ====================
         const menuToggle      = document.getElementById('menuToggle');
         const sideMenuWrapper = document.getElementById('sideMenuWrapper');
         const sideMenu        = document.getElementById('sideMenu');
@@ -758,20 +717,31 @@
         const chapterList     = document.getElementById('chapterList');
         const menuRightEl     = document.getElementById('menuRightEl');
 
-        // ==================== 桌面/移动端检测 ====================
+
+        // ==================== 3. 桌面/移动端检测 ====================
         const isDesktop = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
         if (isDesktop) document.body.classList.add('is-desktop');
 
-        // === 1. 收集 h1/h2/h3，生成唯一 ID ===
-        const allHeadings = Array.from(
-          document.querySelectorAll('.content h1, .content h2, .content h3')
-        ).filter(h => h.textContent.trim() !== '');
 
-        allHeadings.forEach((el, index) => {
-          el.id = `heading-${index}`;
-        });
+        // ==================== 4. 共享状态对象 ====================
+        // 所有跨模块共享的可变状态统一放在这里，读写都通过 state 进行。
+        const state = {
+          currentId:               null,    // 当前高亮的 heading id
+          hoveredItem:             null,     // 正在悬停的 chapter-item 元素
+          activeState:             'scroll', // 状态机：'scroll' | 'hover' | 'menu'
+          isMenuScrolling:         false,
+          isWheelScrolling:        false,
+          isHoverScrolling:        false,
+          programmaticScrollCount: 0,        // 程序驱动的菜单滚动计数
+          menuDrivingArticleCount: 0,        // 菜单驱动的文章滚动计数
+          lastMouseX:              -9999,    // 最新鼠标位置（Reveal 写，Highlighter 读）
+          lastMouseY:              -9999,
+        };
 
-        // === 2. 应用主题 ===
+
+        // ==================== 5. 主题 ====================
+        // 颜色由 CSS 继承控制（body.dark-mode color/#fff，body.light-mode .floating-btn color/#000），
+        // 此处无需再通过 JS 设置 menuToggle 颜色。
         function applyTheme() {
           const savedTheme  = localStorage.getItem('theme');
           const configTheme = "{{ blog.theme.mode }}";
@@ -782,305 +752,459 @@
         }
         applyTheme();
 
-        // === 3. 生成章节导航 ===
-        allHeadings.forEach(heading => {
-          const listItem  = document.createElement('div');
-          const level     = parseInt(heading.tagName.substring(1));
-          const classMap  = { 1: 'h1-item', 2: 'h2-item', 3: 'h3-item' };
-          listItem.className   = `chapter-item ${classMap[level] || 'h1-item'}`;
-          listItem.textContent = heading.textContent;
-          listItem.dataset.id  = heading.id;
 
-          listItem.addEventListener('click', (e) => {
-            e.stopPropagation();
-            heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            closeMenu();
-          });
-
-          if (isDesktop) {
-            listItem.addEventListener('pointerenter', (e) => {
-              if (e.pointerType !== 'mouse') return;
-              onItemPointerEnter(listItem);
-            });
-            listItem.addEventListener('pointerleave', (e) => {
-              if (e.pointerType !== 'mouse') return;
-              onItemPointerLeave();
-            });
-          }
-
-          chapterList.appendChild(listItem);
-        });
-
-        // ==================== 高亮状态机 ====================
-        // 三个互斥状态：scroll（滚动驱动）| hover（鼠标悬停）| menu（菜单列表滑动）
-
-        let currentId   = null;
-        let hoveredItem = null;
-        let activeState = 'scroll';
-
-        // 用 createDebounce 替换原来的裸 timer 变量，集中管理
-        const hoverScrollDebounce  = createDebounce(onHoverScrollDebounced, 1500);
-        const menuScrollDebounce   = createDebounce(onMenuScrollDebounced, 400);
-
-        let isMenuScrolling      = false;
-        // 滚轮滚动标志：只有真实的 wheel 事件才能设置它
-        // 用于屏蔽"元素滑过静止光标"产生的假 pointerenter/pointerleave
-        let isWheelScrolling     = false;
-        // hover触发文章滚动期间，同样需要屏蔽假pointer事件
-        let isHoverScrolling     = false;
-        // 用计数器替换布尔标志，彻底解决嵌套/并发调用时的竞态问题：
-        // 每次程序驱动滚动前 +1，滚动结束后 -1，只有计数为0才视为用户手动滚动。
-        let programmaticScrollCount  = 0;
-        let menuDrivingArticleCount  = 0;
-
-        // 鼠标位置：提升到外层，供 onHoverScrollDebounced 主动查询使用
-        let lastMouseX = -9999;
-        let lastMouseY = -9999;
-
-        // 唯一高亮入口
-        function setHighlight(id) {
-          document.querySelectorAll('.chapter-item.current, .chapter-item.hovered')
-            .forEach(i => i.classList.remove('current', 'hovered'));
-          if (!id) return;
-          const item = document.querySelector(`.chapter-item[data-id="${id}"]`);
-          if (item) item.classList.add(activeState === 'scroll' ? 'current' : 'hovered');
-        }
-
-        // 滚动菜单让指定 item 居中（返回 Promise，解决原来硬编码600ms的竞态）
-        function scrollMenuToItem(id, behavior = 'smooth') {
-          const item = document.querySelector(`.chapter-item[data-id="${id}"]`);
-          if (!item) return Promise.resolve();
-          const target = item.offsetTop - (chapterList.clientHeight - item.offsetHeight) / 2;
-          if (chapterList.scrollHeight <= chapterList.clientHeight) return Promise.resolve();
-
-          programmaticScrollCount++;
-          return smoothScrollPromise(
-            () => chapterList.scrollTo({ top: Math.max(0, target), behavior }),
-            () => chapterList.scrollTop
-          ).finally(() => {
-            programmaticScrollCount--;
-          });
-        }
-
-        function getCenteredItemId() {
-          const items      = chapterList.querySelectorAll('.chapter-item');
-          const containerR = chapterList.getBoundingClientRect();
-          const centerY    = containerR.top + containerR.height / 2;
-          let best = null, bestDist = Infinity;
-          items.forEach(item => {
-            const r    = item.getBoundingClientRect();
-            const mid  = r.top + r.height / 2;
-            const dist = Math.abs(mid - centerY);
-            if (dist < bestDist) { bestDist = dist; best = item; }
-          });
-          return best ? best.dataset.id : null;
-        }
-
-        // === 状态：scroll ===
-        function applyScrollState(id) {
-          if (activeState === 'hover' || activeState === 'menu') return;
-          activeState = 'scroll';
-          currentId   = id;
-          setHighlight(id);
-          if (!isMenuScrolling) scrollMenuToItem(id);
-        }
-
-        function updateActiveHeading() {
-          if (allHeadings.length === 0) return;
-          if (menuDrivingArticleCount > 0) return;
-          if (isHoverScrolling) return;
-          const scrollY = window.scrollY;
-          const offset  = 80;
-          let current   = allHeadings[0];
-          for (let i = 0; i < allHeadings.length; i++) {
-            const top = allHeadings[i].getBoundingClientRect().top + scrollY;
-            if (top <= scrollY + offset) current = allHeadings[i];
-            else break;
-          }
-          if (current.id !== currentId || activeState !== 'scroll') {
-            applyScrollState(current.id);
-          }
-        }
-
-        if (allHeadings.length > 0) {
-          currentId = allHeadings[0].id;
-          applyScrollState(currentId);
-        }
-
-        window.addEventListener('scroll', updateActiveHeading, { passive: true });
-
-        // === 状态：hover ===
-
+        // ==================== 6. 章节高亮器 ====================
         /**
-         * 根据 getItemAtPointer() 的结果主动推进状态机，
-         * 不再依赖浏览器在 DOM 位移后补发的 pointer 事件（时序不可靠）。
-         * @param {Element} item - 触发本轮防抖的 chapter-item
+         * 封装了"章节 item 构建 + 高亮状态机"的全部逻辑。
+         * 对外暴露三个接口：
+         *   init(onItemClick)  - 构建 DOM、绑定事件，传入点击 item 后的回调
+         *   syncToMenu()       - 菜单打开时调用，将当前高亮项即时居中
+         *   cancelHover()      - 菜单关闭时调用，取消悬停状态并回退到 scroll
          */
-        function resolvePointerAfterScroll(item) {
-          const itemAtPointer = getItemAtPointer();
-          if (itemAtPointer && itemAtPointer !== item) {
-            // 鼠标现在压着新的 item B → 移交给 B，重启链
-            onItemPointerEnter(itemAtPointer);
-          } else if (!itemAtPointer) {
-            // 鼠标已离开菜单范围 → 重置为 scroll 状态
-            hoveredItem = null;
-            activeState = 'scroll';
-            setHighlight(currentId);
-          } else {
-            // 鼠标仍在 item 上 → 重启防抖，解决"只触发一次"
-            hoverScrollDebounce.call(item);
+        function createChapterHighlighter({ contentEl, chapterListEl, isDesktop, state }) {
+
+          const hoverScrollDebounce = createDebounce(onHoverScrollDebounced, 1500);
+          const menuScrollDebounce  = createDebounce(onMenuScrollDebounced,  400);
+
+          let allHeadings = [];
+
+          // 主动查询当前鼠标位置下是否有 chapter-item（不依赖浏览器补发的 pointer 事件）
+          function getItemAtPointer() {
+            const el = document.elementFromPoint(state.lastMouseX, state.lastMouseY);
+            return el ? el.closest('.chapter-item') : null;
           }
-        }
 
-        async function onHoverScrollDebounced(item) {
-          if (activeState !== 'hover' || hoveredItem !== item) return;
-          setHighlight(item.dataset.id);
+          // 唯一高亮入口
+          function setHighlight(id) {
+            chapterListEl.querySelectorAll('.chapter-item.current, .chapter-item.hovered')
+              .forEach(i => i.classList.remove('current', 'hovered'));
+            if (!id) return;
+            const item = chapterListEl.querySelector(`.chapter-item[data-id="${id}"]`);
+            if (item) item.classList.add(state.activeState === 'scroll' ? 'current' : 'hovered');
+          }
 
-          // 先等菜单居中完成，再跳转文章，避免两个 smoothScrollPromise 并发竞争
-          isHoverScrolling = true;
-          await scrollMenuToItem(item.dataset.id);
-          isHoverScrolling = false;
+          // 滚动菜单让指定 item 居中（返回 Promise，避免硬编码超时）
+          function scrollMenuToItem(id, behavior = 'smooth') {
+            const item = chapterListEl.querySelector(`.chapter-item[data-id="${id}"]`);
+            if (!item) return Promise.resolve();
+            const target = item.offsetTop - (chapterListEl.clientHeight - item.offsetHeight) / 2;
+            if (chapterListEl.scrollHeight <= chapterListEl.clientHeight) return Promise.resolve();
 
-          // 居中完成后校验状态机：只要 hoveredItem 还是 item，就继续执行文章跳转。
-          // 不在这里用 elementFromPoint 判断 —— item 可能因居中滚动而物理偏离光标，
-          // 误判为"鼠标离开"会导致跳转丢失。
-          // 外部中断（移到新 item 或离开菜单）会通过 pointer 事件直接修改 hoveredItem，
-          // 状态机本身已经能可靠反映这一点。
-          if (activeState !== 'hover' || hoveredItem !== item) return;
+            state.programmaticScrollCount++;
+            return smoothScrollPromise(
+              () => chapterListEl.scrollTo({ top: Math.max(0, target), behavior }),
+              () => chapterListEl.scrollTop
+            ).finally(() => { state.programmaticScrollCount--; });
+          }
 
-          // 继续执行文章跳转
-          const targetHeading = document.getElementById(item.dataset.id);
-          if (targetHeading) {
-            isHoverScrolling = true;
-            menuDrivingArticleCount++;
-            try {
-              await smoothScrollPromise(
-                () => targetHeading.scrollIntoView({ behavior: 'smooth', block: 'start' }),
-                () => window.scrollY
-              );
-            } finally {
-              menuDrivingArticleCount--;
-              // currentId 先于 isHoverScrolling 更新，确保 onItemPointerLeave
-              // 拿不到过期的旧值
-              if (activeState === 'hover' && hoveredItem === item) {
-                currentId = item.dataset.id;
+          // 找到当前菜单可视区中心最近的 item
+          function getCenteredItemId() {
+            const items      = chapterListEl.querySelectorAll('.chapter-item');
+            const containerR = chapterListEl.getBoundingClientRect();
+            const centerY    = containerR.top + containerR.height / 2;
+            let best = null, bestDist = Infinity;
+            items.forEach(item => {
+              const r    = item.getBoundingClientRect();
+              const dist = Math.abs(r.top + r.height / 2 - centerY);
+              if (dist < bestDist) { bestDist = dist; best = item; }
+            });
+            return best ? best.dataset.id : null;
+          }
+
+          // --- 状态：scroll ---
+          function applyScrollState(id) {
+            if (state.activeState === 'hover' || state.activeState === 'menu') return;
+            state.activeState = 'scroll';
+            state.currentId   = id;
+            setHighlight(id);
+            if (!state.isMenuScrolling) scrollMenuToItem(id);
+          }
+
+          function updateActiveHeading() {
+            if (allHeadings.length === 0) return;
+            if (state.menuDrivingArticleCount > 0) return;
+            if (state.isHoverScrolling) return;
+            const scrollY = window.scrollY;
+            const offset  = 80;
+            let current   = allHeadings[0];
+            for (let i = 0; i < allHeadings.length; i++) {
+              const top = allHeadings[i].getBoundingClientRect().top + scrollY;
+              if (top <= scrollY + offset) current = allHeadings[i];
+              else break;
+            }
+            if (current.id !== state.currentId || state.activeState !== 'scroll') {
+              applyScrollState(current.id);
+            }
+          }
+
+          // --- 状态：hover ---
+          /**
+           * DOM 位移后主动推进状态机，不依赖浏览器补发的 pointer 事件（时序不可靠）。
+           */
+          function resolvePointerAfterScroll(item) {
+            const itemAtPointer = getItemAtPointer();
+            if (itemAtPointer && itemAtPointer !== item) {
+              onItemPointerEnter(itemAtPointer);      // 移交给新 item，重启链
+            } else if (!itemAtPointer) {
+              state.hoveredItem = null;
+              state.activeState = 'scroll';
+              setHighlight(state.currentId);          // 鼠标已离开菜单
+            } else {
+              hoverScrollDebounce.call(item);         // 仍在同一 item，重启防抖
+            }
+          }
+
+          async function onHoverScrollDebounced(item) {
+            if (state.activeState !== 'hover' || state.hoveredItem !== item) return;
+            setHighlight(item.dataset.id);
+
+            // 先居中菜单，再跳文章，避免两个 smoothScrollPromise 并发竞争
+            state.isHoverScrolling = true;
+            await scrollMenuToItem(item.dataset.id);
+            state.isHoverScrolling = false;
+
+            // 居中后校验状态：外部中断会直接修改 state，这里只需读取即可
+            if (state.activeState !== 'hover' || state.hoveredItem !== item) return;
+
+            const targetHeading = document.getElementById(item.dataset.id);
+            if (targetHeading) {
+              state.isHoverScrolling = true;
+              state.menuDrivingArticleCount++;
+              try {
+                await smoothScrollPromise(
+                  () => targetHeading.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+                  () => window.scrollY
+                );
+              } finally {
+                state.menuDrivingArticleCount--;
+                // currentId 先于 isHoverScrolling 更新，防止 onItemPointerLeave 读到旧值
+                if (state.activeState === 'hover' && state.hoveredItem === item) {
+                  state.currentId = item.dataset.id;
+                }
+                state.isHoverScrolling = false;
+                if (state.activeState === 'hover' && state.hoveredItem === item) {
+                  resolvePointerAfterScroll(item);
+                }
               }
-              isHoverScrolling = false;
-
-              // 文章跳转结束后再查一次，保持链持续运转
-              if (activeState === 'hover' && hoveredItem === item) {
+            } else {
+              state.isHoverScrolling = false;
+              if (state.activeState === 'hover' && state.hoveredItem === item) {
                 resolvePointerAfterScroll(item);
               }
             }
-          } else {
-            isHoverScrolling = false;
-            if (activeState === 'hover' && hoveredItem === item) {
-              resolvePointerAfterScroll(item);
-            }
           }
-        }
 
-        function onItemPointerEnter(item) {
-          if (isWheelScrolling || isHoverScrolling) return;
-          hoveredItem = item;
-          activeState = 'hover';
-          setHighlight(item.dataset.id);
-          hoverScrollDebounce.call(item);
-        }
-
-        function onItemPointerLeave() {
-          if (isWheelScrolling || isHoverScrolling) return;
-          hoverScrollDebounce.cancel();
-          hoveredItem = null;
-          activeState = 'scroll';
-          setHighlight(currentId);
-          scrollMenuToItem(currentId);
-        }
-
-        if (isDesktop) {
-          chapterList.addEventListener('pointerleave', (e) => {
-            if (e.pointerType !== 'mouse') return;
-            if (isWheelScrolling || isHoverScrolling) return;
-            if (activeState === 'hover') onItemPointerLeave();
-          });
-        }
-
-        // === 状态：menu ===
-        // 监听滚轮事件，设置屏蔽标志，防止假 pointer 事件干扰
-        chapterList.addEventListener('wheel', () => {
-          if (!isWheelScrolling) {
-            isWheelScrolling = true;
-            if (activeState === 'hover') {
-              hoverScrollDebounce.cancel();
-              hoveredItem = null;
-              activeState = 'scroll';
-            }
+          function onItemPointerEnter(item) {
+            if (state.isWheelScrolling || state.isHoverScrolling) return;
+            state.hoveredItem = item;
+            state.activeState = 'hover';
+            setHighlight(item.dataset.id);
+            hoverScrollDebounce.call(item);
           }
-          // isWheelScrolling 不用计时器清除
-          // 由 onMenuScrollDebounced 在完全跑完后释放，杜绝时序竞争
-        }, { passive: true });
 
-        chapterList.addEventListener('scroll', () => {
-          if (programmaticScrollCount > 0) return;
-          if (activeState === 'hover') return;
-          isMenuScrolling = true;
-          activeState = 'menu';
-          // 实时更新高亮跟随菜单中心项，而不是等防抖结束后才跳变
-          const realtimeId = getCenteredItemId();
-          if (realtimeId) setHighlight(realtimeId);
-          menuScrollDebounce.call();
-        }, { passive: true });
+          function onItemPointerLeave() {
+            if (state.isWheelScrolling || state.isHoverScrolling) return;
+            hoverScrollDebounce.cancel();
+            state.hoveredItem = null;
+            state.activeState = 'scroll';
+            setHighlight(state.currentId);
+            scrollMenuToItem(state.currentId);
+          }
 
-        function onMenuScrollDebounced() {
-          isMenuScrolling = false;
-          const centerId = getCenteredItemId();
-          if (!centerId) { isWheelScrolling = false; return; }
+          // --- 状态：menu ---
+          function onMenuScrollDebounced() {
+            state.isMenuScrolling = false;
+            const centerId = getCenteredItemId();
+            if (!centerId) { state.isWheelScrolling = false; return; }
 
-          scrollMenuToItem(centerId).then(() => {
-            if (activeState !== 'menu' || hoveredItem) { isWheelScrolling = false; return; }
+            scrollMenuToItem(centerId).then(() => {
+              if (state.activeState !== 'menu' || state.hoveredItem) {
+                state.isWheelScrolling = false;
+                return;
+              }
+              state.currentId = centerId;
+              setHighlight(centerId);
 
-            currentId = centerId;
-            setHighlight(centerId);
+              const targetHeading = document.getElementById(centerId);
+              if (targetHeading) {
+                state.menuDrivingArticleCount++;
+                smoothScrollPromise(
+                  () => targetHeading.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+                  () => window.scrollY
+                ).finally(() => {
+                  state.menuDrivingArticleCount--;
+                  state.isWheelScrolling = false;
+                  if (state.activeState === 'menu' && !state.hoveredItem) {
+                    state.activeState = 'scroll';
+                    setHighlight(state.currentId);
+                  }
+                });
+              } else {
+                state.isWheelScrolling = false;
+                state.activeState = 'scroll';
+                setHighlight(state.currentId);
+              }
+            }).catch(() => {
+              // scrollMenuToItem 失败时确保滚轮锁一定被释放
+              state.isWheelScrolling = false;
+            });
+          }
 
-            const targetHeading = document.getElementById(centerId);
-            if (targetHeading) {
-              menuDrivingArticleCount++;
-              smoothScrollPromise(
-                () => targetHeading.scrollIntoView({ behavior: 'smooth', block: 'start' }),
-                () => window.scrollY
-              ).finally(() => {
-                menuDrivingArticleCount--;
-                isWheelScrolling = false;  // 文章滚完才释放，整个流程结束
-                if (activeState === 'menu' && !hoveredItem) {
-                  activeState = 'scroll';
-                  setHighlight(currentId);
-                }
+          function onTouchEnd() {
+            if (state.hoveredItem) state.hoveredItem = null;
+            if (state.activeState === 'menu') menuScrollDebounce.call();
+          }
+
+          // --- 公开接口 ---
+
+          function init(onItemClick) {
+            allHeadings = Array.from(contentEl.querySelectorAll('h1, h2, h3'))
+              .filter(h => h.textContent.trim() !== '');
+            allHeadings.forEach((el, index) => { el.id = `heading-${index}`; });
+
+            const classMap = { 1: 'h1-item', 2: 'h2-item', 3: 'h3-item' };
+            allHeadings.forEach(heading => {
+              const listItem       = document.createElement('div');
+              const level          = parseInt(heading.tagName[1]);
+              listItem.className   = `chapter-item ${classMap[level] || 'h1-item'}`;
+              listItem.textContent = heading.textContent;
+              listItem.dataset.id  = heading.id;
+
+              listItem.addEventListener('click', (e) => {
+                e.stopPropagation();
+                heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                onItemClick?.();
               });
-            } else {
-              isWheelScrolling = false;
-              activeState = 'scroll';
-              setHighlight(currentId);
+
+              if (isDesktop) {
+                listItem.addEventListener('pointerenter', (e) => {
+                  if (e.pointerType !== 'mouse') return;
+                  onItemPointerEnter(listItem);
+                });
+                listItem.addEventListener('pointerleave', (e) => {
+                  if (e.pointerType !== 'mouse') return;
+                  onItemPointerLeave();
+                });
+              }
+
+              chapterListEl.appendChild(listItem);
+            });
+
+            if (allHeadings.length > 0) {
+              state.currentId = allHeadings[0].id;
+              applyScrollState(state.currentId);
             }
+
+            window.addEventListener('scroll', updateActiveHeading, { passive: true });
+
+            // 滚轮：设置屏蔽标志，防止假 pointer 事件干扰
+            chapterListEl.addEventListener('wheel', () => {
+              if (!state.isWheelScrolling) {
+                state.isWheelScrolling = true;
+                if (state.activeState === 'hover') {
+                  hoverScrollDebounce.cancel();
+                  state.hoveredItem = null;
+                  state.activeState = 'scroll';
+                }
+              }
+            }, { passive: true });
+
+            // 菜单列表滚动：实时更新高亮并触发防抖吸附
+            chapterListEl.addEventListener('scroll', () => {
+              if (state.programmaticScrollCount > 0) return;
+              if (state.activeState === 'hover') return;
+              state.isMenuScrolling = true;
+              state.activeState     = 'menu';
+              const realtimeId = getCenteredItemId();
+              if (realtimeId) setHighlight(realtimeId);
+              menuScrollDebounce.call();
+            }, { passive: true });
+
+            // 移动端：手指离开时立即触发一次防抖，比等惯性停止响应更快
+            chapterListEl.addEventListener('touchend',    onTouchEnd);
+            chapterListEl.addEventListener('touchcancel', onTouchEnd);
+
+            if (isDesktop) {
+              chapterListEl.addEventListener('pointerleave', (e) => {
+                if (e.pointerType !== 'mouse') return;
+                if (state.isWheelScrolling || state.isHoverScrolling) return;
+                if (state.activeState === 'hover') onItemPointerLeave();
+              });
+            }
+          }
+
+          /** 菜单打开时调用：将当前高亮项即时居中。 */
+          function syncToMenu() {
+            if (state.currentId) scrollMenuToItem(state.currentId, 'instant');
+          }
+
+          /** 菜单关闭时调用：取消悬停状态，回退到 scroll。 */
+          function cancelHover() {
+            hoverScrollDebounce.cancel();
+            state.hoveredItem = null;
+            if (state.activeState === 'hover') {
+              state.activeState = 'scroll';
+              setHighlight(state.currentId);
+            }
+          }
+
+          return { init, syncToMenu, cancelHover };
+        }
+
+
+        // ==================== 7. Reveal 效果（仅桌面）====================
+        /**
+         * 封装了全部 Reveal 光效逻辑：CSS 变量更新、Canvas 分隔线发光、事件绑定。
+         * 对外暴露两个接口：
+         *   resizeCanvas()   - 菜单打开时调用，初始化 canvas 尺寸
+         *   clearAllReveal() - 菜单关闭时调用，清除所有光效
+         */
+        function initRevealEffect({ canvasEl, chapterListEl, menuWrapperEl, targets, state }) {
+          const ctx = canvasEl.getContext('2d');
+          let cachedMenuRect = null;
+
+          const isMenuActive = () => menuWrapperEl.classList.contains('active');
+
+          function resizeCanvas() {
+            if (!isMenuActive()) return;
+            const r = chapterListEl.getBoundingClientRect();
+            canvasEl.width       = r.width;
+            canvasEl.height      = r.height;
+            canvasEl.style.left  = r.left + 'px';
+            canvasEl.style.top   = r.top  + 'px';
+            cachedMenuRect = r;
+          }
+
+          const redrawAfterScroll = createDebounce(() => {
+            if (isMenuActive()) {
+              resizeCanvas();
+              drawDividerGlow(state.lastMouseX, state.lastMouseY);
+            }
+          }, 150);
+
+          // 菜单内部滚动时：先清除、再防抖重绘，避免残影
+          chapterListEl.addEventListener('scroll', () => {
+            if (isMenuActive()) {
+              requestAnimationFrame(() => {
+                resizeCanvas();
+                ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+              });
+              redrawAfterScroll.call();
+            }
+          }, { passive: true });
+
+          function drawDividerGlow(mouseX, mouseY) {
+            ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+            if (!isMenuActive()) return;
+
+            const style    = getComputedStyle(document.body);
+            const colorHi  = style.getPropertyValue('--reveal-hi').trim();
+            const colorMid = style.getPropertyValue('--reveal-mid').trim();
+
+            // 尺寸/位置校验，避免 resize 后使用旧 rect
+            const menuRect = chapterListEl.getBoundingClientRect();
+            if (canvasEl.width  !== Math.round(menuRect.width)  ||
+                canvasEl.height !== Math.round(menuRect.height) ||
+                parseFloat(canvasEl.style.left) !== menuRect.left ||
+                parseFloat(canvasEl.style.top)  !== menuRect.top) {
+              canvasEl.width      = menuRect.width;
+              canvasEl.height     = menuRect.height;
+              canvasEl.style.left = menuRect.left + 'px';
+              canvasEl.style.top  = menuRect.top  + 'px';
+              cachedMenuRect      = menuRect;
+            }
+
+            const radius = 80;
+            if (distToRect(mouseX, mouseY, menuRect) > radius) return;
+
+            chapterListEl.querySelectorAll('.chapter-item:not(:last-child)').forEach(item => {
+              const itemRect  = item.getBoundingClientRect();
+              const lineY     = itemRect.bottom - menuRect.top;
+              const lineLeft  = itemRect.left   - menuRect.left + 8;
+              const lineRight = itemRect.right  - menuRect.left - 8;
+
+              if (lineY < 0 || lineY > canvasEl.height) return;
+
+              const nearestX = Math.max(lineLeft, Math.min(mouseX - menuRect.left, lineRight));
+              const dist     = Math.hypot(
+                mouseX - menuRect.left - nearestX,
+                mouseY - menuRect.top  - lineY
+              );
+              if (dist > radius) return;
+
+              const intensity = 1 - dist / radius;
+              const gx   = mouseX - menuRect.left;
+              const grad = ctx.createRadialGradient(gx, lineY, 0, gx, lineY, radius);
+              grad.addColorStop(0,   `rgba(${colorHi},${intensity})`);
+              grad.addColorStop(0.4, `rgba(${colorMid},${0.65 * intensity})`);
+              grad.addColorStop(1,   `rgba(${colorMid},0)`);
+
+              ctx.beginPath();
+              ctx.moveTo(lineLeft,  lineY);
+              ctx.lineTo(lineRight, lineY);
+              ctx.lineWidth   = 1;
+              ctx.strokeStyle = grad;
+              ctx.stroke();
+            });
+          }
+
+          function clearAllReveal() {
+            targets.forEach(({ el }) => clearRevealVar(el));
+            ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+            canvasEl.classList.remove('active');
+          }
+
+          function handleMove(e) {
+            if (e.pointerType && e.pointerType !== 'mouse') return;
+            state.lastMouseX = e.clientX;
+            state.lastMouseY = e.clientY;
+            const menuActive = isMenuActive();
+
+            // 统一循环，新增 target 只需在外部 targets 数组追加一行
+            targets.forEach(({ el, range, alwaysOn, distFn }) => {
+              if (!alwaysOn && !menuActive) { clearRevealVar(el); return; }
+              updateRevealVar(el, e.clientX, e.clientY, range, distFn);
+            });
+
+            if (menuActive) {
+              if (!cachedMenuRect) resizeCanvas();
+              canvasEl.classList.add('active');
+              drawDividerGlow(e.clientX, e.clientY);
+            }
+          }
+
+          document.addEventListener('pointermove',  handleMove);
+          document.addEventListener('pointerup',    handleMove);
+          document.addEventListener('pointerleave', clearAllReveal);
+          window.addEventListener('blur',           clearAllReveal);
+
+          window.addEventListener('resize', () => {
+            cachedMenuRect = null;
+            resizeCanvas();
           });
+
+          return { resizeCanvas, clearAllReveal };
         }
 
-        // 移动端：手指离开时立即触发一次防抖（重置计时器到 400ms 后），
-        // 比等惯性滚动自然停止更快响应，同时不会在惯性期间提前吸附。
-        function onTouchEnd() {
-          if (hoveredItem) hoveredItem = null;
-          if (activeState === 'menu') menuScrollDebounce.call();
-        }
-        chapterList.addEventListener('touchend',    onTouchEnd);
-        chapterList.addEventListener('touchcancel', onTouchEnd);
 
-        // === 4. 菜单控制 ===
+        // ==================== 8. 主初始化 ====================
+
+        // --- 创建高亮器（此时 closeMenu 尚未定义，通过回调注入）---
+        const highlighter = createChapterHighlighter({
+          contentEl:    document.querySelector('.content'),
+          chapterListEl: chapterList,
+          isDesktop,
+          state,
+        });
+
+        // --- 菜单控制（UI 层操作 + 调用各模块接口）---
         function openMenu() {
           sideMenuWrapper.classList.add('active');
           sideMenu.classList.add('active');
           menuMask.classList.add('active');
           menuToggle.style.display = 'none';
-          if (currentId) scrollMenuToItem(currentId, 'instant');
-          if (isDesktop) resizeCanvas();
+          highlighter.syncToMenu();
+          if (isDesktop) reveal.resizeCanvas();
         }
 
         function closeMenu() {
@@ -1088,18 +1212,34 @@
           sideMenu.classList.remove('active');
           menuMask.classList.remove('active');
           menuToggle.style.display = 'flex';
-
-          if (isDesktop) {
-            clearAllReveal();
-            hoverScrollDebounce.cancel();
-            hoveredItem  = null;
-            if (activeState === 'hover') {
-              activeState = 'scroll';
-              setHighlight(currentId);
-            }
-          }
+          if (isDesktop) reveal.clearAllReveal();
+          highlighter.cancelHover();
         }
 
+        // --- 初始化高亮器（传入 closeMenu 作为 item 点击回调）---
+        highlighter.init(closeMenu);
+
+        // --- 初始化 Reveal（仅桌面）---
+        let reveal = null;
+        if (isDesktop) {
+          reveal = initRevealEffect({
+            canvasEl:      document.getElementById('menuRevealCanvas'),
+            chapterListEl: chapterList,
+            menuWrapperEl: sideMenuWrapper,
+            targets: [
+              { el: menuToggle,      range: 60, alwaysOn: true,  distFn: distToRect    },
+              { el: sideMenuWrapper, range: 80, alwaysOn: false, distFn: distToRect    },
+              { el: menuRightEl,     range: 80, alwaysOn: false, distFn: distToRect    },
+              { el: closeBtn,        range: 80, alwaysOn: false, distFn: distToTopEdge },
+            ],
+            state,
+          });
+        }
+
+        // resize 同步进度条颜色（原版即为无条件，移动端也需要）
+        window.addEventListener('resize', updateProgress, { passive: true });
+
+        // --- 按钮事件 ---
         menuToggle.addEventListener('click',  (e) => { e.stopPropagation(); openMenu(); });
         closeBtn.addEventListener('click',    (e) => { e.stopPropagation(); closeMenu(); });
         menuMask.addEventListener('click',    (e) => { e.stopPropagation(); closeMenu(); });
@@ -1124,7 +1264,7 @@
           closeMenu();
         });
 
-        // === 5. 滚动进度指示器 ===
+        // ==================== 9. 滚动进度指示器（保持原样）====================
         const toggleRevealStyle = document.createElement('style');
         document.head.appendChild(toggleRevealStyle);
 
@@ -1166,149 +1306,7 @@
         }
 
         window.addEventListener('scroll', updateProgress, { passive: true });
-        window.addEventListener('resize', updateProgress, { passive: true });
         updateProgress();
-
-        // ==================== Reveal Highlight（仅桌面）====================
-        if (isDesktop) {
-
-          const canvas = document.getElementById('menuRevealCanvas');
-          const ctx    = canvas.getContext('2d');
-          let cachedMenuRect = null;
-          // lastMouseX / lastMouseY 已在外层声明，此处直接使用
-
-          // Reveal 目标列表：每个目标只需声明元素、感应范围、距离策略
-          // 新增目标只要在这里加一行即可，handleMove 不需要改动
-          const revealTargets = [
-            { el: menuToggle,      range: 60,  alwaysOn: true,  distFn: distToRect     },
-            { el: sideMenuWrapper, range: 80,  alwaysOn: false, distFn: distToRect     },
-            { el: menuRightEl,     range: 80,  alwaysOn: false, distFn: distToRect     },
-            { el: closeBtn,        range: 80,  alwaysOn: false, distFn: distToTopEdge  },
-          ];
-
-          function resizeCanvas() {
-            if (!sideMenuWrapper.classList.contains('active')) return;
-            const r = chapterList.getBoundingClientRect();
-            canvas.width       = r.width;
-            canvas.height      = r.height;
-            canvas.style.left  = r.left + 'px';
-            canvas.style.top   = r.top  + 'px';
-            cachedMenuRect = r;
-          }
-
-          const redrawAfterScroll = createDebounce(() => {
-            if (sideMenuWrapper.classList.contains('active')) {
-              resizeCanvas();
-              drawDividerGlow(lastMouseX, lastMouseY);
-            }
-          }, 150);
-
-          chapterList.addEventListener('scroll', () => {
-            if (sideMenuWrapper.classList.contains('active')) {
-              requestAnimationFrame(() => {
-                resizeCanvas();
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-              });
-              redrawAfterScroll.call();
-            }
-          }, { passive: true });
-
-          function drawDividerGlow(mouseX, mouseY) {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            if (!sideMenuWrapper.classList.contains('active')) return;
-
-            const style    = getComputedStyle(document.body);
-            const colorHi  = style.getPropertyValue('--reveal-hi').trim();
-            const colorMid = style.getPropertyValue('--reveal-mid').trim();
-
-            const menuRect = chapterList.getBoundingClientRect();
-            if (canvas.width  !== Math.round(menuRect.width)  ||
-                canvas.height !== Math.round(menuRect.height) ||
-                parseFloat(canvas.style.left) !== menuRect.left ||
-                parseFloat(canvas.style.top)  !== menuRect.top) {
-              canvas.width      = menuRect.width;
-              canvas.height     = menuRect.height;
-              canvas.style.left = menuRect.left + 'px';
-              canvas.style.top  = menuRect.top  + 'px';
-              cachedMenuRect    = menuRect;
-            }
-
-            // 用封装好的 distToRect 判断鼠标是否在感应范围内
-            const radius = 80;
-            if (distToRect(mouseX, mouseY, menuRect) > radius) return;
-
-            const items = chapterList.querySelectorAll('.chapter-item:not(:last-child)');
-            items.forEach(item => {
-              const itemRect  = item.getBoundingClientRect();
-              const lineY     = itemRect.bottom - menuRect.top;
-              const lineLeft  = itemRect.left   - menuRect.left + 8;
-              const lineRight = itemRect.right  - menuRect.left - 8;
-
-              if (lineY < 0 || lineY > canvas.height) return;
-
-              const nearestX = Math.max(lineLeft, Math.min(mouseX - menuRect.left, lineRight));
-              const dist     = Math.hypot(
-                mouseX - menuRect.left - nearestX,
-                mouseY - menuRect.top  - lineY
-              );
-              if (dist > radius) return;
-
-              const intensity = 1 - dist / radius;
-              const gx   = mouseX - menuRect.left;
-              const grad = ctx.createRadialGradient(gx, lineY, 0, gx, lineY, radius);
-              grad.addColorStop(0,   `rgba(${colorHi},${1.0 * intensity})`);
-              grad.addColorStop(0.4, `rgba(${colorMid},${0.65 * intensity})`);
-              grad.addColorStop(1,   `rgba(${colorMid},0)`);
-
-              ctx.beginPath();
-              ctx.moveTo(lineLeft,  lineY);
-              ctx.lineTo(lineRight, lineY);
-              ctx.lineWidth   = 1;
-              ctx.strokeStyle = grad;
-              ctx.stroke();
-            });
-          }
-
-          function clearAllReveal() {
-            revealTargets.forEach(({ el }) => clearRevealVar(el));
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            canvas.classList.remove('active');
-          }
-
-          function handleMove(e) {
-            if (e.pointerType && e.pointerType !== 'mouse') return;
-            lastMouseX = e.clientX;
-            lastMouseY = e.clientY;
-            const menuActive = sideMenuWrapper.classList.contains('active');
-
-            // 统一循环处理所有 Reveal 目标，无需为每个目标写特判分支
-            revealTargets.forEach(({ el, range, alwaysOn, distFn }) => {
-              if (!alwaysOn && !menuActive) {
-                clearRevealVar(el);
-                return;
-              }
-              updateRevealVar(el, e.clientX, e.clientY, range, distFn);
-            });
-
-            if (menuActive) {
-              if (!cachedMenuRect) resizeCanvas();
-              canvas.classList.add('active');
-              drawDividerGlow(e.clientX, e.clientY);
-            }
-          }
-
-          document.addEventListener('pointermove',  handleMove);
-          document.addEventListener('pointerup',    handleMove);
-          document.addEventListener('pointerleave', clearAllReveal);
-          window.addEventListener('blur',           clearAllReveal);
-
-          window.addEventListener('resize', () => {
-            cachedMenuRect = null;
-            resizeCanvas();
-            updateProgress();
-          });
-
-        } // end isDesktop
 
       </script>
 
