@@ -419,6 +419,8 @@
             left: 8px;
             right: 8px;
             height: 1px;
+            transform: scaleY(0.5);
+            transform-origin: bottom;
             background: rgba(255, 255, 255, 0.3);
             transition: opacity 0.3s;
          }
@@ -812,12 +814,21 @@
           }
 
           // --- 状态：scroll ---
+
+          // 菜单位置跟随用 debounce：高亮实时更新，菜单只在滚动停止后才跟随。
+          // 避免快速滚动时多个并发 smooth scroll 互相打架造成闪烁。
+          const menuSyncDebounce = createDebounce((id) => {
+            if (state.activeState === 'scroll' && !state.isMenuScrolling) {
+              scrollMenuToItem(id);
+            }
+          }, 150);
+
           function applyScrollState(id) {
             if (state.activeState === 'hover' || state.activeState === 'menu') return;
             state.activeState = 'scroll';
             state.currentId   = id;
-            setHighlight(id);
-            if (!state.isMenuScrolling) scrollMenuToItem(id);
+            setHighlight(id);           // 高亮实时同步
+            menuSyncDebounce.call(id);  // 菜单位置 debounce，滚动停止后跟随
           }
 
           function updateActiveHeading() {
@@ -995,16 +1006,7 @@
               applyScrollState(state.currentId);
             }
 
-            // rAF 节流：快速滚动时每帧最多执行一次，消除 setHighlight 高频抖动
-            let headingRafPending = false;
-            window.addEventListener('scroll', () => {
-              if (headingRafPending) return;
-              headingRafPending = true;
-              requestAnimationFrame(() => {
-                headingRafPending = false;
-                updateActiveHeading();
-              });
-            }, { passive: true });
+            window.addEventListener('scroll', updateActiveHeading, { passive: true });
 
             // 滚轮：设置屏蔽标志，防止假 pointer 事件干扰
             // 从 hover 切出时立即 setHighlight，清除残留的 .hovered 类，避免双高亮
@@ -1085,9 +1087,8 @@
 
           const isMenuActive = () => menuWrapperEl.classList.contains('active');
 
-          /** 构建 item rect 缓存（相对于 menuRect）。 */
-          function buildItemRectCache() {
-            const menuRect = chapterListEl.getBoundingClientRect();
+          /** 构建 item rect 缓存（相对于 menuRect），使用调用方已有的 menuRect 避免重复 reflow。 */
+          function buildItemRectCache(menuRect) {
             cachedItemRects = Array.from(
               chapterListEl.querySelectorAll('.chapter-item:not(:last-child)')
             ).map(item => {
@@ -1146,12 +1147,13 @@
             ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
             if (!isMenuActive()) return;
 
-            // 颜色直接读缓存，无需每帧 getComputedStyle
             const colorHi  = cachedColorHi;
             const colorMid = cachedColorMid;
 
-            // 尺寸/位置校验，避免 resize 后使用旧 rect
+            // 全局只取一次 rect，校验、缓存构建都用这同一个值
             const menuRect = chapterListEl.getBoundingClientRect();
+
+            // 尺寸/位置校验：canvas 与实际位置不符时修正，并同步作废 item 缓存
             if (canvasEl.width  !== Math.round(menuRect.width)  ||
                 canvasEl.height !== Math.round(menuRect.height) ||
                 parseFloat(canvasEl.style.left) !== menuRect.left ||
@@ -1161,19 +1163,16 @@
               canvasEl.style.left = menuRect.left + 'px';
               canvasEl.style.top  = menuRect.top  + 'px';
               cachedMenuRect      = menuRect;
+              cachedItemRects     = null;   // canvas 尺寸变了，旧缓存坐标已失效
             }
 
             const radius = 80;
             if (distToRect(mouseX, mouseY, menuRect) > radius) return;
 
-            // item rect 缓存兜底：正常情况下 resizeCanvas 已确保缓存存在；
-            // 若因时序问题为 null，回退到实时查询，保证绘制不跳帧。
-            const items = cachedItemRects ?? (() => {
-              buildItemRectCache();
-              return cachedItemRects;
-            })();
+            // 懒加载：传入已有的 menuRect，避免再次 reflow
+            if (!cachedItemRects) buildItemRectCache(menuRect);
 
-            items.forEach(({ lineY, lineLeft, lineRight }) => {
+            cachedItemRects.forEach(({ lineY, lineLeft, lineRight }) => {
               if (lineY < 0 || lineY > canvasEl.height) return;
 
               const nearestX = Math.max(lineLeft, Math.min(mouseX - menuRect.left, lineRight));
