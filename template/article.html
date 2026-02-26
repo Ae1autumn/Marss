@@ -995,9 +995,19 @@
               applyScrollState(state.currentId);
             }
 
-            window.addEventListener('scroll', updateActiveHeading, { passive: true });
+            // rAF 节流：快速滚动时每帧最多执行一次，消除 setHighlight 高频抖动
+            let headingRafPending = false;
+            window.addEventListener('scroll', () => {
+              if (headingRafPending) return;
+              headingRafPending = true;
+              requestAnimationFrame(() => {
+                headingRafPending = false;
+                updateActiveHeading();
+              });
+            }, { passive: true });
 
             // 滚轮：设置屏蔽标志，防止假 pointer 事件干扰
+            // 从 hover 切出时立即 setHighlight，清除残留的 .hovered 类，避免双高亮
             chapterListEl.addEventListener('wheel', () => {
               if (!state.isWheelScrolling) {
                 state.isWheelScrolling = true;
@@ -1005,6 +1015,7 @@
                   hoverScrollDebounce.cancel();
                   state.hoveredItem = null;
                   state.activeState = 'scroll';
+                  setHighlight(state.currentId);
                 }
               }
             }, { passive: true });
@@ -1104,9 +1115,11 @@
             canvasEl.style.left  = r.left + 'px';
             canvasEl.style.top   = r.top  + 'px';
             cachedMenuRect = r;
-            // 菜单打开 / resize 后同步重建缓存
+            // 颜色只依赖主题，可以立即更新
             updateColorCache();
-            buildItemRectCache();
+            // item 位置依赖动画完成后的 layout，此处只置为 null，
+            // drawDividerGlow 在真正绘制时再懒加载，确保坐标正确
+            cachedItemRects = null;
           }
 
           const redrawAfterScroll = createDebounce(() => {
