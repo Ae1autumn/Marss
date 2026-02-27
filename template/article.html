@@ -1341,14 +1341,7 @@
           sideMenu.classList.remove('active');
           menuMask.classList.remove('active');
           menuToggle.style.display = 'flex';
-          if (isDesktop) {
-            reveal.clearAllReveal();
-            // clearAllReveal 会把所有元素的 --rx/--ry 清成 -9999px。
-            // 菜单关闭后 menuToggle 重新可见，立即用上次鼠标位置刷新一次，
-            // 避免鼠标没动时光效永远不回来。
-            const rect = menuToggle.getBoundingClientRect();
-            updateRevealVar(menuToggle, state.lastMouseX, state.lastMouseY, 60, distToRect, rect);
-          }
+          if (isDesktop) reveal.clearAllReveal();
           highlighter.cancelHover();
         }
 
@@ -1434,15 +1427,7 @@
           document.body.style.setProperty('--toggle-mid', midColor);
         }
 
-        window.addEventListener('scroll', () => {
-          updateProgress();
-          // 滚动时鼠标未移动，手动用上次记录的位置刷新 menuToggle 的 Reveal 变量，
-          // 避免 --rx/--ry 停留在旧值导致光效失效。
-          if (reveal) {
-            const rect = menuToggle.getBoundingClientRect();
-            updateRevealVar(menuToggle, state.lastMouseX, state.lastMouseY, 60, distToRect, rect);
-          }
-        }, { passive: true });
+        window.addEventListener('scroll', updateProgress, { passive: true });
         updateProgress();
 
       </script>
