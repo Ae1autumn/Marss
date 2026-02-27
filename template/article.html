@@ -806,6 +806,7 @@
 
           const hoverScrollDebounce = createDebounce(onHoverScrollDebounced, 1500);
           const menuScrollDebounce  = createDebounce(onMenuScrollDebounced,  100);
+          let   articleScrollGen    = 0; // 世代计数：每次新文章滚动开始时递增，旧世代 finally 识别后跳过状态更新
 
           let allHeadings = [];
 
@@ -1011,6 +1012,10 @@
 
               const targetHeading = document.getElementById(centerId);
               if (targetHeading) {
+                // 打断上一次进行中的平滑滚动：令其立即稳定，旧 smoothScrollPromise 快速 resolve
+                // 并由世代计数识别为"已被取代"，只做计数清理，不干扰新一轮的状态
+                window.scrollTo({ top: window.scrollY, behavior: 'instant' });
+                const gen = ++articleScrollGen;
                 state.menuDrivingArticleCount++;
                 smoothScrollPromise(
                   () => targetHeading.scrollIntoView({ behavior: 'smooth', block: 'start' }),
@@ -1018,10 +1023,7 @@
                 ).finally(() => {
                   state.menuDrivingArticleCount--;
                   state.isWheelScrolling = false;
-                  // 若用户在文章滚动期间已再次滚动菜单，防抖还在等待，
-                  // 不能在此处抢先重置状态和高亮——那会造成"跳回去"的视觉抖动，
-                  // 且会让防抖触发时因 activeState !== 'menu' 而直接 return，
-                  // 导致用户的新操作目标无法被导航。让防抖自行处理即可。
+                  if (gen !== articleScrollGen) return; // 已被更新世代取代，跳过状态更新
                   if (state.activeState === 'menu' && !state.hoveredItem && !menuScrollDebounce.pending) {
                     state.activeState = 'scroll';
                     setHighlight(state.currentId);
