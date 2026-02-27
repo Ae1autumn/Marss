@@ -1281,7 +1281,10 @@
             if (!cachedTargetRects) refreshTargetRects();
             targets.forEach(({ el, range, alwaysOn, distFn }) => {
               if (!alwaysOn && !menuActive) { clearRevealVar(el); return; }
-              updateRevealVar(el, e.clientX, e.clientY, range, distFn, cachedTargetRects.get(el) ?? null);
+              // alwaysOn 元素（menuToggle）会因 display:none 导致缓存 rect 失效，
+              // 直接实时获取，开销可忽略（fixed 元素，每次 pointermove 只算一次）。
+              const rect = alwaysOn ? null : (cachedTargetRects.get(el) ?? null);
+              updateRevealVar(el, e.clientX, e.clientY, range, distFn, rect);
             });
 
             // Canvas 绘制：rAF 节流，每帧最多执行一次，合并高频 pointermove
@@ -1338,7 +1341,14 @@
           sideMenu.classList.remove('active');
           menuMask.classList.remove('active');
           menuToggle.style.display = 'flex';
-          if (isDesktop) reveal.clearAllReveal();
+          if (isDesktop) {
+            reveal.clearAllReveal();
+            // clearAllReveal 会把所有元素的 --rx/--ry 清成 -9999px。
+            // 菜单关闭后 menuToggle 重新可见，立即用上次鼠标位置刷新一次，
+            // 避免鼠标没动时光效永远不回来。
+            const rect = menuToggle.getBoundingClientRect();
+            updateRevealVar(menuToggle, state.lastMouseX, state.lastMouseY, 60, distToRect, rect);
+          }
           highlighter.cancelHover();
         }
 
