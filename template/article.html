@@ -1018,7 +1018,11 @@
                 ).finally(() => {
                   state.menuDrivingArticleCount--;
                   state.isWheelScrolling = false;
-                  if (state.activeState === 'menu' && !state.hoveredItem) {
+                  // 若用户在文章滚动期间已再次滚动菜单，防抖还在等待，
+                  // 不能在此处抢先重置状态和高亮——那会造成"跳回去"的视觉抖动，
+                  // 且会让防抖触发时因 activeState !== 'menu' 而直接 return，
+                  // 导致用户的新操作目标无法被导航。让防抖自行处理即可。
+                  if (state.activeState === 'menu' && !state.hoveredItem && !menuScrollDebounce.pending) {
                     state.activeState = 'scroll';
                     setHighlight(state.currentId);
                   }
