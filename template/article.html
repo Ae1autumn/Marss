@@ -808,12 +808,6 @@
           const menuScrollDebounce  = createDebounce(onMenuScrollDebounced,  100);
 
           let allHeadings = [];
-          let cachedHeadingTops = [];  // heading 绝对 top 缓存，scroll 时无需 reflow
-
-          function buildHeadingTopCache() {
-            const sy = window.scrollY;
-            cachedHeadingTops = allHeadings.map(h => h.getBoundingClientRect().top + sy);
-          }
 
           // 主动查询当前鼠标位置下是否有 chapter-item（不依赖浏览器补发的 pointer 事件）
           function getItemAtPointer() {
@@ -846,11 +840,13 @@
 
           // 找到当前菜单可视区中心最近的 item
           function getCenteredItemId() {
-            const items   = chapterListEl.querySelectorAll('.chapter-item');
-            const centerY = chapterListEl.scrollTop + chapterListEl.clientHeight / 2;
+            const items      = chapterListEl.querySelectorAll('.chapter-item');
+            const containerR = chapterListEl.getBoundingClientRect();
+            const centerY    = containerR.top + containerR.height / 2;
             let best = null, bestDist = Infinity;
             items.forEach(item => {
-              const dist = Math.abs(item.offsetTop + item.offsetHeight / 2 - centerY);
+              const r    = item.getBoundingClientRect();
+              const dist = Math.abs(r.top + r.height / 2 - centerY);
               if (dist < bestDist) { bestDist = dist; best = item; }
             });
             return best ? best.dataset.id : null;
@@ -880,12 +876,12 @@
             if (state.isHoverScrolling) return;
             const scrollY = window.scrollY;
             const offset  = 80;
-            let currentIndex = 0;
-            for (let i = 0; i < cachedHeadingTops.length; i++) {
-              if (cachedHeadingTops[i] <= scrollY + offset) currentIndex = i;
+            let current   = allHeadings[0];
+            for (let i = 0; i < allHeadings.length; i++) {
+              const top = allHeadings[i].getBoundingClientRect().top + scrollY;
+              if (top <= scrollY + offset) current = allHeadings[i];
               else break;
             }
-            const current = allHeadings[currentIndex];
             if (current.id !== state.currentId || state.activeState !== 'scroll') {
               applyScrollState(current.id);
             }
@@ -1038,8 +1034,6 @@
               applyScrollState(state.currentId);
             }
 
-            buildHeadingTopCache();
-            window.addEventListener('resize', buildHeadingTopCache, { passive: true });
             window.addEventListener('scroll', updateActiveHeading, { passive: true });
 
             // 滚轮：设置屏蔽标志，防止假 pointer 事件干扰
@@ -1138,7 +1132,6 @@
           let rafPending      = false;
           // ④ target rect 缓存：fixed 定位元素只在 resize / 菜单打开时位置变化，无需每帧 reflow
           let cachedTargetRects = null; // Map<el, DOMRect>
-          let isAnimating       = false; // menuAppear 动画进行中时为 true，此期间禁止写入 rect 缓存
 
           const isMenuActive = () => menuWrapperEl.classList.contains('active');
 
@@ -1190,15 +1183,7 @@
             // 返回的是变换后的小尺寸，立即缓存会导致边框光效定位严重偏移。
             // 先置 null（handleMove 会实时取 rect 降级），动画结束后再正式缓存。
             cachedTargetRects = null;
-            // target rect 缓存：menuAppear 动画耗时 0.3s，scale 期间 getBoundingClientRect
-            // 返回的是变换后的小尺寸，立即缓存会导致边框光效定位严重偏移。
-            // 动画期间设置 isAnimating = true，handleMove 检测到后只走实时路径不写缓存；
-            // 动画结束后才正式建立缓存，走快路径。
-            isAnimating = true;
-            setTimeout(() => {
-              isAnimating = false;
-              refreshTargetRects();
-            }, 330);
+            setTimeout(refreshTargetRects, 330);
           }
 
           const redrawAfterScroll = createDebounce(() => {
@@ -1213,7 +1198,10 @@
           chapterListEl.addEventListener('scroll', () => {
             if (isMenuActive()) {
               cachedItemRects = null;
-              ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+              requestAnimationFrame(() => {
+                resizeCanvas();
+                ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+              });
               redrawAfterScroll.call();
             }
           }, { passive: true });
@@ -1288,11 +1276,10 @@
 
             // CSS 变量更新：不涉及绘制，直接同步执行（开销很低）
             // 使用缓存 rect，避免每次 pointermove 对 fixed 元素重复 reflow
-            // 动画期间 isAnimating = true，此时不写入缓存，直接走 updateRevealVar 内部的实时路径
-            if (!cachedTargetRects && !isAnimating) refreshTargetRects();
+            if (!cachedTargetRects) refreshTargetRects();
             targets.forEach(({ el, range, alwaysOn, distFn }) => {
               if (!alwaysOn && !menuActive) { clearRevealVar(el); return; }
-              updateRevealVar(el, e.clientX, e.clientY, range, distFn, cachedTargetRects?.get(el) ?? null);
+              updateRevealVar(el, e.clientX, e.clientY, range, distFn, cachedTargetRects.get(el) ?? null);
             });
 
             // Canvas 绘制：rAF 节流，每帧最多执行一次，合并高频 pointermove
