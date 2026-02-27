@@ -799,6 +799,11 @@
           const hoverScrollDebounce = createDebounce(onHoverScrollDebounced, 1500);
           const menuScrollDebounce  = createDebounce(onMenuScrollDebounced,  100);
 
+          // 代际计数器：每次 onMenuScrollDebounced 开始时递增并捕获当前值。
+          // 异步续体通过对比 myGen 与 menuScrollGeneration 判断自己是否已被后来者取代。
+          // 被取代的调用直接放弃，只释放 isWheelScrolling，状态由最新一次统一收尾。
+          let menuScrollGeneration = 0;
+
           let allHeadings = [];
 
           // 主动查询当前鼠标位置下是否有 chapter-item（不依赖浏览器补发的 pointer 事件）
@@ -955,8 +960,7 @@
 
           // --- 状态：menu ---
           function onMenuScrollDebounced() {
-            // 菜单已关闭时（display:none 导致 rect 全为 0）直接释放锁并退出，
-            // 防止 getCenteredItemId 错误返回第一项，进而驱动文章滚回开头。
+            // 菜单已关闭时直接释放锁并退出
             if (!sideMenuWrapper.classList.contains('active')) {
               state.isWheelScrolling = false;
               if (state.activeState === 'menu') state.activeState = 'scroll';
@@ -966,11 +970,14 @@
             const centerId = getCenteredItemId();
             if (!centerId) { state.isWheelScrolling = false; return; }
 
+            // 捕获本次代际，后续所有异步续体通过对比判断是否已被取代
+            const myGen = ++menuScrollGeneration;
+
             scrollMenuToItem(centerId).then(() => {
-              if (state.activeState !== 'menu' || state.hoveredItem) {
-                state.isWheelScrolling = false;
-                return;
-              }
+              // 已被后来者取代：释放锁，状态交给新代际处理
+              if (myGen !== menuScrollGeneration) { state.isWheelScrolling = false; return; }
+              if (state.activeState !== 'menu' || state.hoveredItem) { state.isWheelScrolling = false; return; }
+
               state.currentId = centerId;
               setHighlight(centerId);
 
@@ -983,7 +990,9 @@
                 ).finally(() => {
                   state.menuDrivingArticleCount--;
                   state.isWheelScrolling = false;
-                  if (state.activeState === 'menu' && !state.hoveredItem && !menuScrollDebounce.pending) {
+                  // 再次检查：文章滚动期间可能又有新的菜单滚动发生
+                  if (myGen !== menuScrollGeneration) return;
+                  if (state.activeState === 'menu' && !state.hoveredItem) {
                     state.activeState = 'scroll';
                     setHighlight(state.currentId);
                   }
@@ -994,7 +1003,6 @@
                 setHighlight(state.currentId);
               }
             }).catch(() => {
-              // scrollMenuToItem 失败时确保滚轮锁一定被释放
               state.isWheelScrolling = false;
             });
           }
