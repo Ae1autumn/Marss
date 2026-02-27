@@ -394,10 +394,6 @@
             border: none;
          }
    
-         body.is-desktop.light-mode .side-menu {
-            border: none;
-         }
-   
          .side-menu.active {
             display: flex;
          }
@@ -565,10 +561,6 @@
          body.is-desktop .close-btn {
             border-top: none;
             background: transparent;
-         }
-   
-         body.is-desktop.light-mode .close-btn {
-            border-top: none;
          }
    
          body.is-desktop .close-btn::before {
@@ -958,7 +950,14 @@
             state.hoveredItem = null;
             state.activeState = 'scroll';
             setHighlight(state.currentId);
-            scrollMenuToItem(state.currentId);
+            // 仅当目标 item 不在可视区内时才触发菜单滚动，避免无意义的 smooth scroll 抖动
+            const targetItem = chapterListEl.querySelector(`.chapter-item[data-id="${state.currentId}"]`);
+            if (targetItem) {
+              const itemRect      = targetItem.getBoundingClientRect();
+              const containerRect = chapterListEl.getBoundingClientRect();
+              const isVisible     = itemRect.top >= containerRect.top && itemRect.bottom <= containerRect.bottom;
+              if (!isVisible) scrollMenuToItem(state.currentId);
+            }
           }
 
           // --- 状态：menu ---
@@ -1100,8 +1099,9 @@
           /** 菜单关闭时调用：取消悬停状态，回退到 scroll。 */
           function cancelHover() {
             hoverScrollDebounce.cancel();
+            menuScrollDebounce.cancel();
             state.hoveredItem = null;
-            if (state.activeState === 'hover') {
+            if (state.activeState === 'hover' || state.activeState === 'menu') {
               state.activeState = 'scroll';
               setHighlight(state.currentId);
             }
@@ -1174,16 +1174,23 @@
             canvasEl.style.left  = r.left + 'px';
             canvasEl.style.top   = r.top  + 'px';
             cachedMenuRect = r;
-            // 颜色只依赖主题，可以立即更新
             updateColorCache();
-            // item 位置依赖动画完成后的 layout，此处只置为 null，
-            // drawDividerGlow 在真正绘制时再懒加载，确保坐标正确
-            cachedItemRects = null;
-            // target rect 缓存：menuAppear 动画耗时 0.3s，scale 期间 getBoundingClientRect
-            // 返回的是变换后的小尺寸，立即缓存会导致边框光效定位严重偏移。
+            cachedItemRects   = null;
+            // target rect 缓存：menuAppear 动画期间 getBoundingClientRect 返回变换中的小尺寸，
             // 先置 null（handleMove 会实时取 rect 降级），动画结束后再正式缓存。
             cachedTargetRects = null;
-            setTimeout(refreshTargetRects, 330);
+            const wrapper = menuWrapperEl;
+            const onAnimEnd = () => {
+              wrapper.removeEventListener('animationend', onAnimEnd);
+              if (isMenuActive()) refreshTargetRects();
+            };
+            // 若菜单已无动画在跑（如 resize 时），animationend 不会触发；
+            // 用 getAnimations() 判断，若无动画则立即刷新。
+            if (wrapper.getAnimations().length > 0) {
+              wrapper.addEventListener('animationend', onAnimEnd);
+            } else {
+              refreshTargetRects();
+            }
           }
 
           const redrawAfterScroll = createDebounce(() => {
@@ -1199,7 +1206,6 @@
             if (isMenuActive()) {
               cachedItemRects = null;
               requestAnimationFrame(() => {
-                resizeCanvas();
                 ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
               });
               redrawAfterScroll.call();
