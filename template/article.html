@@ -930,22 +930,23 @@
 
             // 先居中菜单，再跳文章，避免两个 smoothScrollPromise 并发竞争
             state.isHoverScrolling = true;
-            await scrollMenuToItem(item.dataset.id);
-            state.isHoverScrolling = false;
-
-            // 居中后校验状态：外部中断会直接修改 state，这里只需读取即可
-            if (state.activeState !== 'hover' || state.hoveredItem !== item) return;
-
-            state.isHoverScrolling = true;
-            driveArticleScroll(item.dataset.id, () => {
-              // currentId 先于 isHoverScrolling 更新，防止 onItemPointerLeave 读到旧值
-              if (state.activeState === 'hover' && state.hoveredItem === item) {
-                state.currentId = item.dataset.id;
-              }
+            scrollMenuToItem(item.dataset.id).then(() => {
               state.isHoverScrolling = false;
-              if (state.activeState === 'hover' && state.hoveredItem === item) {
-                resolvePointerAfterScroll(item);
-              }
+
+              // 居中后校验状态：外部中断会直接修改 state，这里只需读取即可
+              if (state.activeState !== 'hover' || state.hoveredItem !== item) return;
+
+              state.isHoverScrolling = true;
+              driveArticleScroll(item.dataset.id, () => {
+                // currentId 先于 isHoverScrolling 更新，防止 onItemPointerLeave 读到旧值
+                if (state.activeState === 'hover' && state.hoveredItem === item) {
+                  state.currentId = item.dataset.id;
+                }
+                state.isHoverScrolling = false;
+                if (state.activeState === 'hover' && state.hoveredItem === item) {
+                  resolvePointerAfterScroll(item);
+                }
+              });
             });
           }
 
