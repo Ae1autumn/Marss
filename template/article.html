@@ -377,16 +377,14 @@
             display: none;
             flex-direction: row;
             overflow: hidden;
-            background: rgba(18, 18, 18, 0.6);
-            backdrop-filter: blur(24px) saturate(180%);
-            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            /* background / backdrop-filter 已移至五层子元素（见 .menu-layer-*）*/
             border: 1px solid rgba(255, 255, 255, 0.18);
             pointer-events: auto;
-            transition: background 0.5s ease, border-color 0.5s ease;
+            isolation: isolate;         /* 防止子层 z-index 溢出到 wrapper 层 */
+            transition: border-color 0.5s ease;
          }
    
          body.light-mode .side-menu {
-            background: rgba(255, 255, 255, 0.6);
             border-color: rgba(0, 0, 0, 0.12);
          }
    
@@ -398,9 +396,61 @@
             display: flex;
          }
    
+         /* ==================== 菜单五层材质结构（z-index 7-10，由 JS buildMenuLayers 注入 DOM）==================== */
+         /* 所有层：绝对定位，充满 .side-menu，pointer-events:none 不拦截交互 */
+         .menu-layer-base,
+         .menu-layer-light,
+         .menu-layer-acrylic,
+         .menu-layer-texture {
+            position: absolute;
+            inset: 0;
+            border-radius: 12px;
+            pointer-events: none;
+         }
+
+         /* 底层（z-index:7）：最轻亚克力底衬，云母色的主要来源 */
+         .menu-layer-base {
+            z-index: 7;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(3px);
+            -webkit-backdrop-filter: blur(3px);
+         }
+         body.light-mode .menu-layer-base {
+            background: rgba(0, 0, 0, 0.03);
+         }
+
+         /* 第4层（z-index:8）：内部体积光，跟随鼠标（复用父级 --rx/ry 变量，无需新增事件监听）*/
+         .menu-layer-light {
+            z-index: 8;
+            background: radial-gradient(
+               150px circle at var(--rx, -9999px) var(--ry, -9999px),
+               rgba(var(--reveal-hi,  255, 0, 0), 0.11),
+               rgba(var(--reveal-mid, 180, 30, 30), 0.055) 45%,
+               transparent 70%
+            );
+         }
+
+         /* 第3层（z-index:9）：过渡层，柔化光照光与边框光之间的边界 */
+         .menu-layer-acrylic {
+            z-index: 9;
+            background: rgba(255, 255, 255, 0.07);
+            backdrop-filter: blur(10px) saturate(140%);
+            -webkit-backdrop-filter: blur(10px) saturate(140%);
+            opacity: 0.5;
+         }
+         body.light-mode .menu-layer-acrylic {
+            background: rgba(0, 0, 0, 0.05);
+         }
+
+         /* 第2层（z-index:10）：斑驳质感预留槽，暂无内容 */
+         .menu-layer-texture {
+            z-index: 10;
+         }
+
          /* ==================== 菜单左侧：章节列表 ==================== */
          .menu-left {
             position: relative;
+            z-index: 11;            /* 覆盖在 .menu-layer-* (z-index 7-10) 之上 */
             width: 200px;
             padding: 20px;
             overflow-y: auto;
@@ -474,6 +524,7 @@
          /* ==================== 菜单右侧：按钮区 ==================== */
          .menu-right {
             position: relative;
+            z-index: 11;            /* 同上，覆盖在 .menu-layer-* 之上 */
             width: 50px;
             height: 100%;
             display: flex;
@@ -593,6 +644,18 @@
                rgba(var(--toggle-mid, 180, 30,  30),  0.45) 45%,
                transparent 70%
             );
+         }
+
+         /* ==================== floating-btn 悬停发光（M2 移除 boxShadow='none' 后生效）==================== */
+         body.is-desktop .floating-btn:hover {
+            box-shadow: 0 0 18px 5px rgba(var(--toggle-hi, 255, 0, 0), 0.40),
+                        0 6px 24px rgba(0, 0, 0, 0.45);
+            transition: box-shadow 0.25s ease;
+         }
+
+         /* ==================== 菜单容器阴影 ==================== */
+         .side-menu-wrapper {
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.28);
          }
    
          .header, .floating-btn, .side-menu, .comments {
@@ -779,12 +842,16 @@
         // ==================== 5. 主题 ====================
         // 颜色由 CSS 继承控制（body.dark-mode color/#fff，body.light-mode .floating-btn color/#000），
         // 此处无需再通过 JS 设置 menuToggle 颜色。
+        // _isLightMode：模块级缓存，仅在 applyTheme 时更新，避免 updateProgress 每次滚动读取 classList
+        let _isLightMode = false;
+
         function applyTheme() {
           const savedTheme  = localStorage.getItem('theme');
           const configTheme = "{{ blog.theme.mode }}";
           const mode        = savedTheme || configTheme;
-          document.body.classList.toggle('light-mode', mode === 'light');
-          document.body.classList.toggle('dark-mode',  mode !== 'light');
+          _isLightMode = (mode === 'light');
+          document.body.classList.toggle('light-mode', _isLightMode);
+          document.body.classList.toggle('dark-mode',  !_isLightMode);
           // 移除 <head> 里注入的临时防闪样式（若存在）
           const fouc = document.getElementById('theme-fouc-fix');
           if (fouc) fouc.remove();
@@ -828,6 +895,8 @@
           const menuScrollDebounce  = createDebounce(onMenuScrollDebounced,  400);
 
           let allHeadings = [];
+          // 缓存当前持有 .current / .hovered 的 DOM 元素，避免每次 setHighlight 调用 querySelectorAll
+          let _currentHighlightEl = null;
 
           // 主动查询当前鼠标位置下是否有 chapter-item（不依赖浏览器补发的 pointer 事件）
           function getItemAtPointer() {
@@ -835,13 +904,18 @@
             return el ? el.closest('.chapter-item') : null;
           }
 
-          // 唯一高亮入口
+          // 唯一高亮入口：直接操作缓存引用，避免全量 querySelectorAll
           function setHighlight(id) {
-            chapterListEl.querySelectorAll('.chapter-item.current, .chapter-item.hovered')
-              .forEach(i => i.classList.remove('current', 'hovered'));
+            if (_currentHighlightEl) {
+              _currentHighlightEl.classList.remove('current', 'hovered');
+              _currentHighlightEl = null;
+            }
             if (!id) return;
             const item = chapterListEl.querySelector(`.chapter-item[data-id="${id}"]`);
-            if (item) item.classList.add(state.activeState === 'scroll' ? 'current' : 'hovered');
+            if (item) {
+              item.classList.add(state.activeState === 'scroll' ? 'current' : 'hovered');
+              _currentHighlightEl = item;
+            }
           }
 
           // 滚动菜单让指定 item 居中（返回 Promise，避免硬编码超时）
@@ -1093,9 +1167,10 @@
             }
           }
 
-          /** 菜单打开时调用：将当前高亮项即时居中。 */
+          /** 菜单打开时调用：将当前高亮项即时居中。返回 Promise 供入场动画等待（M11 预留）。 */
           function syncToMenu() {
-            if (state.currentId) scrollMenuToItem(state.currentId, 'instant');
+            if (state.currentId) return scrollMenuToItem(state.currentId, 'instant');
+            return Promise.resolve();
           }
 
           /** 菜单关闭时调用：取消悬停状态，回退到 scroll。
@@ -1339,7 +1414,116 @@
         }
 
 
-        // ==================== 8. 主初始化 ====================
+        // ==================== 8. Mica 颜色采样器 ====================
+        /**
+         * 通过 document.elementFromPoint 网格采样视口中心区域的主色调，
+         * 经 HSL 偏移后写入 CSS 变量，供五层结构和 Reveal 效果使用。
+         * 采样失败（含跨域 SecurityError）时静默降级，保留 CSS 默认值。
+         *
+         * 对外暴露：sample() → Promise<void>
+         */
+        function createMicaSampler() {
+          function parseRgba(str) {
+            const m = str.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+            return m ? [+m[1], +m[2], +m[3]] : null;
+          }
+          function isOpaque(bg) {
+            if (!bg || bg === 'transparent') return false;
+            const m = bg.match(/rgba\([^)]+,\s*([\d.]+)\s*\)/);
+            return !(m && parseFloat(m[1]) < 0.05);
+          }
+          function rgbToHsl(r, g, b) {
+            r /= 255; g /= 255; b /= 255;
+            const max = Math.max(r, g, b), min = Math.min(r, g, b);
+            let h = 0, s = 0, l = (max + min) / 2;
+            if (max !== min) {
+              const d = max - min;
+              s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+              switch (max) {
+                case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+                case g: h = ((b - r) / d + 2) / 6; break;
+                case b: h = ((r - g) / d + 4) / 6; break;
+              }
+            }
+            return [h * 360, s * 100, l * 100];
+          }
+          function hslToRgb(h, s, l) {
+            h /= 360; s /= 100; l /= 100;
+            if (s === 0) { const v = Math.round(l * 255); return [v, v, v]; }
+            const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+            const p = 2 * l - q;
+            const hue2rgb = (p, q, t) => {
+              if (t < 0) t += 1; if (t > 1) t -= 1;
+              if (t < 1/6) return p + (q - p) * 6 * t;
+              if (t < 1/2) return q;
+              if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+              return p;
+            };
+            return [
+              Math.round(hue2rgb(p, q, h + 1/3) * 255),
+              Math.round(hue2rgb(p, q, h)       * 255),
+              Math.round(hue2rgb(p, q, h - 1/3) * 255),
+            ];
+          }
+          function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+
+          async function sample() {
+            try {
+              const vw = window.innerWidth, vh = window.innerHeight;
+              const cx = vw / 2, cy = vh / 2;
+              const rx = vw * 0.1, ry = vh * 0.1;   // 视口中心 20%×20% 区域
+              const GRID = 4;
+              const colors = [];
+
+              for (let i = 0; i < GRID; i++) {
+                for (let j = 0; j < GRID; j++) {
+                  const x = cx - rx + rx * 2 * i / (GRID - 1);
+                  const y = cy - ry + ry * 2 * j / (GRID - 1);
+                  let el = document.elementFromPoint(x, y);
+                  // 向上遍历 DOM 树，找第一个不透明背景色
+                  while (el && el !== document.documentElement) {
+                    const bg = getComputedStyle(el).backgroundColor;
+                    if (isOpaque(bg)) {
+                      const rgb = parseRgba(bg);
+                      if (rgb) { colors.push(rgb); break; }
+                    }
+                    el = el.parentElement;
+                  }
+                }
+              }
+              if (colors.length === 0) return;   // 采样为空，静默降级
+
+              // 计算区域平均色
+              const [rA, gA, bA] = colors
+                .reduce((a, c) => [a[0]+c[0], a[1]+c[1], a[2]+c[2]], [0,0,0])
+                .map(v => Math.round(v / colors.length));
+
+              const [h, s, l] = rgbToHsl(rA, gA, bA);
+
+              // HSL 偏移：+17% 亮度 → 光效色；-17% 亮度 → 深色层；饱和度略降 → mid/right
+              const lHi    = clamp(l + 17, 0, 100);
+              const lDark  = clamp(l - 17, 0, 100);
+              const sDim   = s * 0.82;
+
+              const rgbHi    = hslToRgb(h, s,   lHi);
+              const rgbMid   = hslToRgb(h, sDim, lHi);
+              const rgbDarkL = hslToRgb(h, s,   lDark);
+              const rgbDarkR = hslToRgb(h, sDim, clamp(lDark + 3, 0, 100));
+
+              document.body.style.setProperty('--reveal-hi',       rgbHi.join(', '));
+              document.body.style.setProperty('--reveal-mid',      rgbMid.join(', '));
+              document.body.style.setProperty('--mica-dark-left',  rgbDarkL.join(', '));
+              document.body.style.setProperty('--mica-dark-right', rgbDarkR.join(', '));
+            } catch (_) {
+              // 静默降级：跨域 SecurityError 或其他异常，保留 CSS 变量现有默认值
+            }
+          }
+
+          return { sample };
+        }
+
+
+        // ==================== 9. 主初始化 ====================
 
         // --- 创建高亮器（此时 closeMenu 尚未定义，通过回调注入）---
         const highlighter = createChapterHighlighter({
@@ -1349,16 +1533,39 @@
           state,
         });
 
+        // --- Mica 采样器（M5）---
+        const micaSampler = createMicaSampler();
+
+        /**
+         * buildMenuLayers（M6）：向 .side-menu 注入五层结构 DOM。
+         * 幂等设计：检测 .menu-layer-base 是否已存在，防止重复插入。
+         * 在初始化阶段执行一次，菜单关闭/打开不会重新创建。
+         */
+        function buildMenuLayers() {
+          if (sideMenu.querySelector('.menu-layer-base')) return;
+          const fragment = document.createDocumentFragment();
+          ['base', 'light', 'acrylic', 'texture'].forEach(name => {
+            const layer = document.createElement('div');
+            layer.className = `menu-layer-${name}`;
+            fragment.appendChild(layer);
+          });
+          // 插入到 menu-left 之前，确保在文档流上处于底部（z-index 控制实际绘制顺序）
+          sideMenu.insertBefore(fragment, sideMenu.firstChild);
+        }
+        buildMenuLayers();
+
         // --- 菜单控制（UI 层操作 + 调用各模块接口）---
-        function openMenu() {
+        async function openMenu() {
           sideMenuWrapper.classList.add('active');
           sideMenu.classList.add('active');
           menuMask.classList.add('active');
-          menuToggle.style.display = 'none';
-          state.isWheelScrolling = false;   // 防御：关/开菜单之间若 debounce 尚未触发，复位屏蔽标志
+          menuToggle.style.display = 'none';    // 同步隐藏按钮，防止重复点击
+          state.isWheelScrolling = false;        // 防御：关/开菜单之间若 debounce 尚未触发，复位屏蔽标志
+          // M5: Mica 采样（写 --reveal-hi/mid 等变量）；必须在 reveal.resizeCanvas() 之前
+          await micaSampler.sample();
           highlighter.syncToMenu();
           if (isDesktop) {
-            reveal.resizeCanvas();
+            reveal.resizeCanvas();               // 读取颜色缓存（在 Mica 之后）
             reveal.attachScrollListener();
           }
         }
@@ -1426,7 +1633,7 @@
           closeMenu();
         });
 
-        // ==================== 9. 滚动进度指示器（保持原样）====================
+        // ==================== 10. 滚动进度指示器（保持原样）====================
         // 缓存上次写入的 redValue，避免值未变时重复触发 style 写入
         let _lastRedValue = -1;
 
@@ -1438,10 +1645,10 @@
           if (redValue !== _lastRedValue) {
             _lastRedValue = redValue;
             menuToggle.style.backgroundColor = `rgb(${redValue}, 0, 0)`;
-            menuToggle.style.boxShadow       = 'none';
+            // ⚠️ 不再写 boxShadow，让 CSS :hover 规则正常生效（M7 依赖此修复）
           }
 
-          const isLight    = document.body.classList.contains('light-mode');
+          const isLight    = _isLightMode;   // 读缓存，避免每次 scroll 触发 classList 查询
           const fadeRatio  = 1 - scrollPercent;
           let hiColor, midColor;
           if (isLight) {
