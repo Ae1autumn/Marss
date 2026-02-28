@@ -427,8 +427,8 @@
             border-radius: 11px;
             background: linear-gradient(
                to right,
-               rgba(var(--reveal-hi,       18, 18, 18), 0.55) 0%,
-               rgba(var(--reveal-hi,       18, 18, 18), 0.55) calc(100% - 50px),
+               rgba(var(--mica-dark-left,  18, 18, 18), 0.55) 0%,
+               rgba(var(--mica-dark-left,  18, 18, 18), 0.55) calc(100% - 50px),
                rgba(var(--mica-dark-right,  0,  0,  0), 0.55) calc(100% - 50px),
                rgba(var(--mica-dark-right,  0,  0,  0), 0.55) 100%
             );
@@ -438,8 +438,8 @@
          body.light-mode .menu-layer-base {
             background: linear-gradient(
                to right,
-               rgba(var(--reveal-hi,      255, 255, 255), 0.55) 0%,
-               rgba(var(--reveal-hi,      255, 255, 255), 0.55) calc(100% - 50px),
+               rgba(var(--mica-dark-left,  255, 255, 255), 0.55) 0%,
+               rgba(var(--mica-dark-left,  255, 255, 255), 0.55) calc(100% - 50px),
                rgba(var(--mica-dark-right, 220, 220, 220), 0.55) calc(100% - 50px),
                rgba(var(--mica-dark-right, 220, 220, 220), 0.55) 100%
             );
@@ -454,7 +454,9 @@
             background: radial-gradient(
                75px circle at var(--lx, -9999px) var(--ly, -9999px),
                rgba(var(--volume-light, 180, 0, 0), 0.055) 0%,
-               rgba(var(--volume-light, 180, 0, 0), 0.02) 50%,
+               rgba(var(--volume-light, 180, 0, 0), 0.03)  30%,
+               rgba(var(--volume-light, 180, 0, 0), 0.008) 60%,
+               rgba(var(--volume-light, 180, 0, 0), 0)     85%,
                transparent 100%
             );
          }
@@ -503,7 +505,7 @@
             align-items: center;
             padding: 10px 0;
             cursor: pointer;
-            color: rgba(255, 255, 255, 0.7);
+            color: rgba(var(--reveal-mid, 180, 30, 30), 0.7);
             transition: color 0.2s, padding-left 0.2s;
             position: relative;
          }
@@ -532,20 +534,20 @@
          .chapter-item:last-child::after { display: none; }
    
          .chapter-item.h1-item { padding-left: 0; }
-         .chapter-item.h2-item { padding-left: 14px; color: rgba(255,255,255,0.45); font-size: 0.9em; }
-         .chapter-item.h3-item { padding-left: 28px; color: rgba(255,255,255,0.3);  font-size: 0.85em; }
+         .chapter-item.h2-item { padding-left: 14px; color: rgba(var(--reveal-mid, 180, 30, 30), 0.65); font-size: 0.9em; }
+         .chapter-item.h3-item { padding-left: 28px; color: rgba(var(--reveal-mid, 180, 30, 30), 0.45); font-size: 0.85em; }
    
-         body.light-mode .chapter-item { color: rgba(0,0,0,0.7); }
-         body.light-mode .chapter-item.h2-item { color: rgba(0,0,0,0.45); }
-         body.light-mode .chapter-item.h3-item { color: rgba(0,0,0,0.3); }
+         body.light-mode .chapter-item { color: rgba(var(--reveal-mid, 60, 60, 160), 0.7); }
+         body.light-mode .chapter-item.h2-item { color: rgba(var(--reveal-mid, 60, 60, 160), 0.45); }
+         body.light-mode .chapter-item.h3-item { color: rgba(var(--reveal-mid, 60, 60, 160), 0.3); }
    
-         body.is-desktop .chapter-item:hover { color: #f00; }
+         body.is-desktop .chapter-item:hover { color: rgba(var(--reveal-hi), 1); }
          body.is-desktop .chapter-item.h1-item:hover { padding-left: 5px; }
          body.is-desktop .chapter-item.h2-item:hover { padding-left: 19px; }
          body.is-desktop .chapter-item.h3-item:hover { padding-left: 33px; }
    
-         .chapter-item.current { color: red !important; }
-         .chapter-item.hovered { color: red !important; }
+         .chapter-item.current { color: rgba(var(--reveal-hi), 1) !important; }
+         .chapter-item.hovered { color: rgba(var(--reveal-hi), 1) !important; }
    
          /* ==================== 菜单右侧：按钮区 ==================== */
          .menu-right {
@@ -602,7 +604,7 @@
          }
    
          .menu-btn {
-            color: rgba(255, 255, 255, 0.75);
+            color: rgba(var(--reveal-mid, 180, 30, 30), 0.75);
             background: none;
             border: none;
             cursor: pointer;
@@ -618,14 +620,14 @@
          }
    
          body.light-mode .menu-btn { color: rgba(0, 0, 0, 0.6); }
-         body.is-desktop .menu-btn:hover { color: #f00; background-color: rgba(255, 0, 0, 0.1); }
+         body.is-desktop .menu-btn:hover { color: rgba(var(--reveal-hi), 1); background-color: rgba(var(--reveal-hi), 0.1); }
    
          .close-btn {
             position: relative;
             height: 50px;
             margin-top: auto;
             background: rgba(0, 0, 0, 0.15);
-            color: rgba(255, 255, 255, 0.6);
+            color: rgba(var(--reveal-mid, 180, 30, 30), 0.6);
             border: none;
             border-top: 1px solid rgba(255, 255, 255, 0.1);
             cursor: pointer;
@@ -663,7 +665,7 @@
             z-index: 3;
          }
    
-         body.is-desktop .close-btn:hover { color: #f00; background-color: rgba(255, 0, 0, 0.08); }
+         body.is-desktop .close-btn:hover { color: rgba(var(--reveal-hi), 1); background-color: rgba(var(--reveal-hi), 0.08); }
    
          /* ==================== Reveal：floating-btn ==================== */
          /* --toggle-hi / --toggle-mid 由 JS updateProgress 随滚动进度实时写入 body，
@@ -1655,9 +1657,11 @@
               // --reveal-mid：亮色与暗色的中间值
               const rgbMid  = rgbHi.map((v, i) => Math.round((v + rgbDark[i]) / 2));
               // --mica-dark-left/right 均从暗色派生，right 略有差异（+5 偏亮，钳位）
-              // ⏸️ --mica-dark-left 当前无消费方（menu-layer-base 左侧已改用 --reveal-hi），保留备用
               const rgbDarkL = rgbDark;
-              const rgbDarkR = rgbDark.map(v => Math.min(255, v + 5));
+              // 夜间模式：右侧比左侧暗 25%（×0.75）；日间模式保持微小差异（+5 偏亮）
+              const rgbDarkR = isLight
+                ? rgbDark.map(v => Math.min(255, v + 5))
+                : rgbDark.map(v => Math.round(v * 0.75));
 
               // 体积光颜色（--volume-light）：HSL 空间调整，与 --reveal-hi 独立
               // 日间：基准色 L+15%，S+30%；夜间：基准色 L-20%，S+30%
