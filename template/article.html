@@ -380,7 +380,9 @@
             /* background / backdrop-filter 已移至五层子元素（见 .menu-layer-*）*/
             border: 1px solid rgba(255, 255, 255, 0.18);
             pointer-events: auto;
-            isolation: isolate;         /* 防止子层 z-index 溢出到 wrapper 层 */
+            /* transform 建立层叠上下文，同时不阻断 overflow:hidden 对子元素的裁剪；
+               isolation:isolate 会阻断裁剪导致 backdrop-filter 溢出圆角边界，不用它 */
+            transform: translateZ(0);
             transition: border-color 0.5s ease;
          }
    
@@ -397,15 +399,13 @@
          }
    
          /* ==================== 菜单五层材质结构（z-index 7-10，由 JS buildMenuLayers 注入 DOM）==================== */
-         /* 各层微扩 inset:-1px 覆盖容器边缘亚像素缝隙，由父级 overflow:hidden 统一裁剪圆角 */
          .menu-layer-base,
          .menu-layer-light,
          .menu-layer-acrylic,
          .menu-layer-texture {
             position: absolute;
-            inset: -1px;          /* 比容器多 1px，消除模糊层边缘渲染缝隙 */
+            inset: 0;
             pointer-events: none;
-            /* 不设 border-radius：由 .side-menu 的 overflow:hidden 统一裁剪 */
          }
 
          /* 底层（z-index:7）：最轻亚克力底衬，云母色的主要来源 */
@@ -435,8 +435,8 @@
          .menu-layer-acrylic {
             z-index: 9;
             background: rgba(255, 255, 255, 0.07);
-            backdrop-filter: blur(10px) saturate(140%);
-            -webkit-backdrop-filter: blur(10px) saturate(140%);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
             opacity: 0.5;
          }
          body.light-mode .menu-layer-acrylic {
@@ -1418,30 +1418,34 @@
 
         // ==================== 8. Mica 颜色采样器 ====================
         /**
-         * 通过 document.elementFromPoint 网格采样视口中心区域的主色调，
-         * 经 HSL 偏移后写入 CSS 变量，供五层结构和 Reveal 效果使用。
-         * 采样失败（含跨域 SecurityError）时静默降级，保留 CSS 默认值。
-         *
+         * Mica 颜色采样器：两路合并方案
+         * 路A：视口内可见 <img> 元素 → 离屏 canvas getImageData（真实像素，权重×3）
+         * 路B：DOM 元素 backgroundColor + color（覆盖无图片场景）
+         * 优先使用有色彩的颜色（hasChroma），全部无彩时退回均值。
+         * 任何异常（含跨域 canvas 污染）静默降级，保留 CSS 变量默认值。
          * 对外暴露：sample() → Promise<void>
          */
         function createMicaSampler() {
+
+          // ── 工具函数 ──────────────────────────────────────────
           function parseRgba(str) {
             const m = str.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
             return m ? [+m[1], +m[2], +m[3]] : null;
           }
-          function isOpaque(bg) {
-            if (!bg || bg === 'transparent') return false;
-            const m = bg.match(/rgba\([^)]+,\s*([\d.]+)\s*\)/);
-            return !(m && parseFloat(m[1]) < 0.05);
+          function isTransparent(str) {
+            if (!str || str === 'transparent') return true;
+            const m = str.match(/rgba\([^)]+,\s*([\d.]+)\s*\)/);
+            return !!(m && parseFloat(m[1]) < 0.05);
           }
-          // 判断颜色是否有足够饱和度（过滤灰色/黑色/白色背景，这些没有有效色彩信息）
-          function hasSaturation(rgb) {
+          // 过滤纯黑/纯白/无彩色（饱和度 < 8%）
+          function hasChroma(rgb) {
             const [r, g, b] = rgb;
             const max = Math.max(r, g, b), min = Math.min(r, g, b);
-            const l = (max + min) / 510;  // 归一化 L
-            if (l < 0.05 || l > 0.95) return false;  // 过暗或过亮（接近纯黑/纯白）
-            const s = l > 0.5 ? (max - min) / (510 - max - min) : (max - min) / (max + min);
-            return s > 0.12;  // 饱和度阈值 12%，过滤无彩色
+            if (max < 8 || min > 247) return false;
+            const l = (max + min) / 510;
+            const s = l > 0.5 ? (max - min) / (510 - max - min)
+                               : (max - min) / (max + min + 1e-6);
+            return s > 0.08;
           }
           function rgbToHsl(r, g, b) {
             r /= 255; g /= 255; b /= 255;
@@ -1478,49 +1482,109 @@
           }
           function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 
-          async function sample() {
+          // ── 路A：从视口内 <img> 元素采像素 ──────────────────
+          function sampleFromImages() {
+            const vw = window.innerWidth, vh = window.innerHeight;
+            const imgs = Array.from(document.querySelectorAll('img')).filter(img => {
+              if (!img.complete || img.naturalWidth === 0) return false;
+              const r = img.getBoundingClientRect();
+              return r.width > 20 && r.height > 20 &&
+                     r.bottom > 0 && r.top < vh &&
+                     r.right  > 0 && r.left < vw;
+            });
+            if (imgs.length === 0) return null;
+            // 面积最大的图片代表性最强
+            imgs.sort((a, b) => {
+              const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+              return (rb.width * rb.height) - (ra.width * ra.height);
+            });
             try {
-              const vw = window.innerWidth, vh = window.innerHeight;
-              const cx = vw / 2, cy = vh / 2;
-              const rx = vw * 0.1, ry = vh * 0.1;   // 视口中心 20%×20% 区域
-              const GRID = 4;
-              const colors = [];
+              const img = imgs[0];
+              const SIZE = 40;
+              const offscreen = document.createElement('canvas');
+              offscreen.width = SIZE; offscreen.height = SIZE;
+              const ctx = offscreen.getContext('2d');
+              ctx.drawImage(img, 0, 0, SIZE, SIZE);
+              const data = ctx.getImageData(0, 0, SIZE, SIZE).data;
+              let rSum = 0, gSum = 0, bSum = 0, count = 0;
+              for (let i = 0; i < data.length; i += 4) {
+                if (data[i + 3] < 128) continue;
+                rSum += data[i]; gSum += data[i+1]; bSum += data[i+2];
+                count++;
+              }
+              if (count === 0) return null;
+              return [Math.round(rSum/count), Math.round(gSum/count), Math.round(bSum/count)];
+            } catch (_) {
+              return null;  // 跨域污染，静默忽略
+            }
+          }
 
-              for (let i = 0; i < GRID; i++) {
-                for (let j = 0; j < GRID; j++) {
-                  const x = cx - rx + rx * 2 * i / (GRID - 1);
-                  const y = cy - ry + ry * 2 * j / (GRID - 1);
-                  let el = document.elementFromPoint(x, y);
-                  // 向上遍历 DOM 树，找第一个不透明背景色
-                  while (el && el !== document.documentElement) {
-                    const bg = getComputedStyle(el).backgroundColor;
-                    if (isOpaque(bg)) {
-                      const rgb = parseRgba(bg);
-                      if (rgb) { colors.push(rgb); break; }
-                    }
-                    el = el.parentElement;
+          // ── 路B：从 DOM 元素采 backgroundColor + color ───────
+          function sampleFromDOM() {
+            const vw = window.innerWidth, vh = window.innerHeight;
+            const cx = vw / 2, cy = vh / 2;
+            const rx = vw * 0.2, ry = vh * 0.2;
+            const GRID = 4;
+            const colors = [];
+            for (let i = 0; i < GRID; i++) {
+              for (let j = 0; j < GRID; j++) {
+                const x = cx - rx + rx * 2 * i / (GRID - 1);
+                const y = cy - ry + ry * 2 * j / (GRID - 1);
+                let el = document.elementFromPoint(x, y);
+                while (el && el !== document.documentElement) {
+                  const cs = getComputedStyle(el);
+                  if (!isTransparent(cs.backgroundColor)) {
+                    const rgb = parseRgba(cs.backgroundColor);
+                    if (rgb) colors.push(rgb);
                   }
+                  // 采文字色：有直接文本子节点的元素
+                  for (const node of el.childNodes) {
+                    if (node.nodeType === 3 && node.textContent.trim()) {
+                      const rgb = parseRgba(cs.color);
+                      if (rgb) colors.push(rgb);
+                      break;
+                    }
+                  }
+                  el = el.parentElement;
                 }
               }
-              if (colors.length === 0) return;   // 采样为空，静默降级
+            }
+            return colors;
+          }
 
-              // 计算区域平均色
-              const [rA, gA, bA] = colors
+          // ── 主采样：两路合并，有色彩优先 ─────────────────────
+          async function sample() {
+            try {
+              const allColors = [];
+
+              const imgColor = sampleFromImages();
+              if (imgColor) {
+                // 图片像素权重×3（代表性强）
+                allColors.push(imgColor, imgColor, imgColor);
+              }
+              allColors.push(...sampleFromDOM());
+
+              if (allColors.length === 0) return;
+
+              const chromaColors = allColors.filter(hasChroma);
+              const source = chromaColors.length > 0 ? chromaColors : allColors;
+
+              const len = source.length;
+              const [rA, gA, bA] = source
                 .reduce((a, c) => [a[0]+c[0], a[1]+c[1], a[2]+c[2]], [0,0,0])
-                .map(v => Math.round(v / colors.length));
+                .map(v => Math.round(v / len));
 
               const [h, s, l] = rgbToHsl(rA, gA, bA);
 
-              // HSL 偏移：+45% 亮度 → 光效高亮色；-45% 亮度 → 深色层
-              // mid 比 hi 低 20% L，制造肉眼可辨的渐变层次；饱和度略降使过渡更自然
-              const lHi    = clamp(l + 45, 0, 100);
-              const lMid   = clamp(lHi - 20, 0, 100);  // 明显低于 hi，确保渐变可见
-              const lDark  = clamp(l - 45, 0, 100);
-              const sDim   = s * 0.82;
+              // 相对亮度 ±45%（HSL L 通道）
+              const lHi   = clamp(l + 45, 0, 100);
+              const lDark = clamp(l - 45, 0, 100);
+              const lMid  = clamp(lHi - 20, 0, 100);
+              const sDim  = s * 0.82;
 
               const rgbHi    = hslToRgb(h, s,    lHi);
-              const rgbMid   = hslToRgb(h, sDim, lMid); // 低亮度版，与 hi 形成对比
-              const rgbDarkL = hslToRgb(h, s,   lDark);
+              const rgbMid   = hslToRgb(h, sDim, lMid);
+              const rgbDarkL = hslToRgb(h, s,    lDark);
               const rgbDarkR = hslToRgb(h, sDim, clamp(lDark + 3, 0, 100));
 
               document.body.style.setProperty('--reveal-hi',       rgbHi.join(', '));
@@ -1528,19 +1592,19 @@
               document.body.style.setProperty('--mica-dark-left',  rgbDarkL.join(', '));
               document.body.style.setProperty('--mica-dark-right', rgbDarkR.join(', '));
 
-              // Mica 联动 floating-btn：写入插值端点，由 updateProgress 负责按进度插值
-              // --mica-btn-dark: 初始色（原 0,0,0 位置）；--mica-btn-hi: 最亮色（原 255,0,0 位置）
-              _micaBtnDark = rgbDarkL;   // 模块级变量，供 updateProgress 读取
+              // 联动 floating-btn 端点，updateProgress 按进度插值
+              _micaBtnDark = rgbDarkL;
               _micaBtnHi   = rgbHi;
-              _micaActive  = true;       // 告知 updateProgress 使用 Mica 端点而非硬编码
-              updateProgress();          // 立即以新端点刷新一次按钮颜色
+              _micaActive  = true;
+              updateProgress();
             } catch (_) {
-              // 静默降级：跨域 SecurityError 或其他异常，保留 CSS 变量现有默认值
+              // 静默降级
             }
           }
 
           return { sample };
         }
+
 
 
         // ==================== 9. 主初始化 ====================
@@ -1720,6 +1784,9 @@
 
         window.addEventListener('scroll', updateProgress, { passive: true });
         updateProgress();
+        // 页面加载后立即取一次色，确保首次进入时按钮颜色就已匹配页面主色调
+        // 用 requestAnimationFrame 确保 DOM 完成首次渲染后再采样
+        requestAnimationFrame(() => micaSampler.sample());
 
       </script>
 
