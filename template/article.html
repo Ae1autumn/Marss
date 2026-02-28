@@ -364,7 +364,7 @@
          }
    
          body.is-desktop .side-menu-wrapper::before {
-            opacity: 1;
+            opacity: var(--ro, 1);
          }
    
          /* ==================== 亚克力侧边菜单 ==================== */
@@ -376,21 +376,27 @@
             display: none;
             flex-direction: row;
             overflow: hidden;
-            /* background / backdrop-filter 已移至五层子元素（见 .menu-layer-*）*/
             border: 1px solid rgba(255, 255, 255, 0.18);
             pointer-events: auto;
-            /* transform 建立层叠上下文，同时不阻断 overflow:hidden 对子元素的裁剪；
-               isolation:isolate 会阻断裁剪导致 backdrop-filter 溢出圆角边界，不用它 */
             transform: translateZ(0);
+            isolation: isolate;
             transition: border-color 0.5s ease;
          }
-   
+
          body.light-mode .side-menu {
             border-color: rgba(0, 0, 0, 0.12);
          }
-   
+
          body.is-desktop .side-menu {
             border: none;
+         }
+
+         body.light-mode .side-menu {
+            outline-color: rgba(0, 0, 0, 0.12);
+         }
+
+         body.is-desktop .side-menu {
+            outline: none;
          }
    
          .side-menu.active {
@@ -407,42 +413,38 @@
             pointer-events: none;
          }
 
-         /* 底层（z-index:7）：亚克力底衬，提供基础不透明度避免遮罩颜色透过 */
+         /* 底层（z-index:7）：唯一的 backdrop-filter 层。
+            border-radius 故意比父容器（12px）少 1px，确保模糊层完全被
+            .side-menu 的 overflow:hidden 裁切，消除 WebKit 亚像素圆角渗色。 */
          .menu-layer-base {
             z-index: 7;
+            border-radius: 11px;
             background: rgba(18, 18, 18, 0.55);
-            backdrop-filter: blur(24px);
-            -webkit-backdrop-filter: blur(24px);
-            border-radius: 12px;    /* 自裁剪，不依赖父级 overflow:hidden */
+            backdrop-filter: blur(7px);
+            -webkit-backdrop-filter: blur(7px);
          }
          body.light-mode .menu-layer-base {
             background: rgba(255, 255, 255, 0.55);
          }
 
-         /* 第4层（z-index:8）：内部体积光，跟随鼠标（复用父级 --rx/ry 变量，无需新增事件监听）
-            不指定圆半径 → 浏览器以 farthest-corner 为准，自然衰减无硬边界 */
+         /* 第4层（z-index:8）：内部体积光，跟随鼠标，纯渐变无 backdrop-filter */
          .menu-layer-light {
             z-index: 8;
-            border-radius: 12px;
             background: radial-gradient(
-               circle at var(--rx, -9999px) var(--ry, -9999px),
-               rgba(var(--reveal-hi,  255, 0, 0), 0.09)  0%,
-               rgba(var(--reveal-mid, 180, 30, 30), 0.04) 40%,
-               transparent 70%
+               400px circle at var(--lx, -9999px) var(--ly, -9999px),
+               rgba(var(--reveal-hi,  255, 0, 0), 0.055) 0%,
+               rgba(var(--reveal-mid, 180, 30, 30), 0.02) 50%,
+               transparent 100%
             );
          }
 
-         /* 第3层（z-index:9）：过渡层，柔化光照光与边框光之间的边界 */
+         /* 第3层（z-index:9）：过渡层，纯色半透明，不使用 backdrop-filter */
          .menu-layer-acrylic {
             z-index: 9;
-            background: rgba(255, 255, 255, 0.07);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border-radius: 12px;
-            opacity: 0.5;
+            background: rgba(255, 255, 255, 0.05);
          }
          body.light-mode .menu-layer-acrylic {
-            background: rgba(0, 0, 0, 0.05);
+            background: rgba(0, 0, 0, 0.03);
          }
 
          /* 第2层（z-index:10）：斑驳质感预留槽，暂无内容 */
@@ -530,11 +532,13 @@
             z-index: 11;            /* 同上，覆盖在 .menu-layer-* 之上 */
             width: 50px;
             height: 100%;
+            min-height: 100%;
             display: flex;
             flex-direction: column;
             background: rgba(0, 0, 0, 0.2);
             border-left: 1px solid rgba(255, 255, 255, 0.15);
             transition: background 0.5s ease, border-color 0.5s ease;
+            flex-shrink: 0;
          }
    
          body.light-mode .menu-right {
@@ -553,7 +557,7 @@
          }
 
          body.is-desktop .menu-right::before {
-            opacity: 1;
+            opacity: var(--ro, 1);
             border-radius: 0 12px 12px 0;
             background: radial-gradient(
                130px circle at var(--rx, -9999px) var(--ry, -9999px),
@@ -596,6 +600,7 @@
          .close-btn {
             position: relative;
             height: 50px;
+            margin-top: auto;
             background: rgba(0, 0, 0, 0.15);
             color: rgba(255, 255, 255, 0.6);
             border: none;
@@ -624,6 +629,7 @@
             left: 0;
             right: 0;
             height: 1px;
+            opacity: var(--ro, 1);
             background: radial-gradient(
                130px circle at var(--rx, -9999px) var(--ry, -9999px),
                rgba(var(--reveal-hi),  0.95),
@@ -641,6 +647,7 @@
             默认值对应初始状态（暗色主题、进度为 0）。                              */
          .floating-btn::before {
             border-radius: 50%;
+            opacity: var(--ro, 1);
             background: radial-gradient(
                80px circle at var(--rx, -9999px) var(--ry, -9999px),
                rgba(var(--toggle-hi,  255, 0,   0),   0.95),
@@ -781,25 +788,33 @@
           return Math.sqrt(dx * dx + dy * dy);
         }
 
-        /** 更新单个 Reveal 元素的 CSS 变量。rect 可由外部传入以复用缓存，省去 reflow。 */
+        /**
+         * 更新单个 Reveal 元素的 CSS 变量。
+         * --rx / --ry：始终写入真实坐标，不再跳 -9999px。
+         * --ro：距离衰减系数（0~1），在 range 内为 1，range 外经过半个 range 宽度的渐变区降至 0；
+         *        CSS 的 radial-gradient opacity 乘以此值，实现平滑淡出而非断片。
+         * rect 可由外部传入以复用缓存，省去 reflow。
+         */
         function updateRevealVar(el, mouseX, mouseY, range, distFn = distToRect, rect = null) {
           if (!el) return;
           const r    = rect || el.getBoundingClientRect();
           const dist = distFn(mouseX, mouseY, r);
-          if (dist <= range) {
-            el.style.setProperty('--rx', (mouseX - r.left) + 'px');
-            el.style.setProperty('--ry', (mouseY - r.top)  + 'px');
-          } else {
-            el.style.setProperty('--rx', '-9999px');
-            el.style.setProperty('--ry', '-9999px');
-          }
+          el.style.setProperty('--rx', (mouseX - r.left) + 'px');
+          el.style.setProperty('--ry', (mouseY - r.top)  + 'px');
+          // 衰减：range 内为 1，fadeZone 内线性降至 0，之外为 0
+          const fadeZone = range * 0.5;
+          const ro = dist <= range            ? 1
+                   : dist <= range + fadeZone ? 1 - (dist - range) / fadeZone
+                   : 0;
+          el.style.setProperty('--ro', ro.toFixed(3));
         }
 
-        /** 清除单个元素的 Reveal 变量。 */
+        /** 清除单个元素的 Reveal 变量（含衰减系数）。 */
         function clearRevealVar(el) {
           if (!el) return;
           el.style.setProperty('--rx', '-9999px');
           el.style.setProperty('--ry', '-9999px');
+          el.style.setProperty('--ro', '0');
         }
 
 
@@ -1204,7 +1219,7 @@
          *   resizeCanvas()   - 菜单打开时调用，初始化 canvas 尺寸
          *   clearAllReveal() - 菜单关闭时调用，清除所有光效
          */
-        function initRevealEffect({ canvasEl, chapterListEl, menuWrapperEl, targets, state }) {
+        function initRevealEffect({ canvasEl, chapterListEl, menuWrapperEl, sideMenuEl, targets, state }) {
           const ctx = canvasEl.getContext('2d');
           let cachedMenuRect  = null;
 
@@ -1218,6 +1233,10 @@
           let rafPending      = false;
           // ④ target rect 缓存：fixed 定位元素只在 resize / 菜单打开时位置变化，无需每帧 reflow
           let cachedTargetRects = null; // Map<el, DOMRect>
+          // ⑤ sideMenu rect 缓存：光照光层坐标基准（整个菜单含 menu-right），由 resizeCanvas 更新
+          let cachedSideMenuRect = null;
+          // ⑥ 菜单打开动画进行中标志：动画期间 getBoundingClientRect 返回变换中坐标，禁止重建缓存
+          let isMenuAnimating = false;
 
           const isMenuActive = () => menuWrapperEl.classList.contains('active');
 
@@ -1259,23 +1278,26 @@
             canvasEl.height      = r.height;
             canvasEl.style.left  = r.left + 'px';
             canvasEl.style.top   = r.top  + 'px';
-            cachedMenuRect = r;
+            cachedMenuRect     = r;
+            cachedSideMenuRect = null;   // 动画期间坐标无效，animationend 后再赋值
             updateColorCache();
             cachedItemRects   = null;
-            // target rect 缓存：menuAppear 动画期间 getBoundingClientRect 返回变换中的小尺寸，
-            // 先置 null（handleMove 会实时取 rect 降级），动画结束后再正式缓存。
+            // target rect / sideMenu rect：menuAppear 动画期间 getBoundingClientRect
+            // 返回变换中的小尺寸，先置 null，动画结束后统一刷新，避免光照光坐标偏移。
             cachedTargetRects = null;
             const wrapper = menuWrapperEl;
             const onAnimEnd = () => {
               wrapper.removeEventListener('animationend', onAnimEnd);
-              if (isMenuActive()) refreshTargetRects();
+              if (isMenuActive()) {
+                refreshTargetRects();
+                cachedSideMenuRect = sideMenuEl.getBoundingClientRect();
+              }
             };
-            // 若菜单已无动画在跑（如 resize 时），animationend 不会触发；
-            // 用 getAnimations() 判断，若无动画则立即刷新。
             if (wrapper.getAnimations().length > 0) {
               wrapper.addEventListener('animationend', onAnimEnd);
             } else {
               refreshTargetRects();
+              cachedSideMenuRect = sideMenuEl.getBoundingClientRect();
             }
           }
 
@@ -1367,6 +1389,9 @@
 
           function clearAllReveal() {
             targets.forEach(({ el }) => clearRevealVar(el));
+            // 光照光层：重置全屏坐标，防止菜单关闭后光斑残留
+            sideMenuEl.style.setProperty('--lx', '-9999px');
+            sideMenuEl.style.setProperty('--ly', '-9999px');
             ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
             canvasEl.classList.remove('active');
             rafPending = false;
@@ -1383,11 +1408,22 @@
             if (!cachedTargetRects) refreshTargetRects();
             targets.forEach(({ el, range, alwaysOn, distFn }) => {
               if (!alwaysOn && !menuActive) { clearRevealVar(el); return; }
-              // alwaysOn 元素（menuToggle）会因 display:none 导致缓存 rect 失效，
-              // 直接实时获取，开销可忽略（fixed 元素，每次 pointermove 只算一次）。
+              // alwaysOn 元素（menuToggle）在菜单打开时被 display:none，
+              // getBoundingClientRect() 返回全零矩形，坐标计算会产生巨大偏移。
+              // menuActive 时 menuToggle 必然隐藏，直接跳过即可。
+              if (alwaysOn && menuActive) { clearRevealVar(el); return; }
               const rect = alwaysOn ? null : (cachedTargetRects.get(el) ?? null);
               updateRevealVar(el, e.clientX, e.clientY, range, distFn, rect);
             });
+
+            // 光照光层（.menu-layer-light）全屏坐标写入：
+            // 不经过 range 裁切，鼠标在屏幕任意位置时均持续更新，
+            // 避免超出菜单边界时光源坐标跳到 -9999px 产生断片。
+            // 坐标系为相对于 .side-menu（光照光层的 position:absolute 定位父容器）。
+            if (menuActive && cachedSideMenuRect) {
+              sideMenuEl.style.setProperty('--lx', (e.clientX - cachedSideMenuRect.left) + 'px');
+              sideMenuEl.style.setProperty('--ly', (e.clientY - cachedSideMenuRect.top)  + 'px');
+            }
 
             // Canvas 绘制：rAF 节流，每帧最多执行一次，合并高频 pointermove
             if (menuActive) {
@@ -1409,8 +1445,9 @@
           window.addEventListener('blur',           clearAllReveal);
 
           function handleResize() {
-            cachedMenuRect  = null;
-            cachedItemRects = null;
+            cachedMenuRect     = null;
+            cachedSideMenuRect = null;
+            cachedItemRects    = null;
             resizeCanvas();
           }
 
@@ -1579,9 +1616,9 @@
               const [h, s, l] = rgbToHsl(rA, gA, bA);
 
               // 相对亮度 ±45%（HSL L 通道）
-              const lHi   = clamp(l + 45, 0, 100);
-              const lDark = clamp(l - 45, 0, 100);
-              const lMid  = clamp(lHi - 20, 0, 100);
+              const lHi   = clamp(l + 15, 0, 100);
+              const lDark = clamp(l - 15, 0, 100);
+              const lMid  = clamp(lHi - 8, 0, 100);
               const sDim  = s * 0.82;
 
               const rgbHi    = hslToRgb(h, s,    lHi);
@@ -1678,6 +1715,7 @@
             canvasEl:      document.getElementById('menuRevealCanvas'),
             chapterListEl: chapterList,
             menuWrapperEl: sideMenuWrapper,
+            sideMenuEl:    sideMenu,
             targets: [
               { el: menuToggle,      range: 60, alwaysOn: true,  distFn: distToRect    },
               { el: sideMenuWrapper, range: 80, alwaysOn: false, distFn: distToRect    },
