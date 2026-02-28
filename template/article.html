@@ -397,15 +397,15 @@
          }
    
          /* ==================== 菜单五层材质结构（z-index 7-10，由 JS buildMenuLayers 注入 DOM）==================== */
-         /* 所有层：绝对定位，充满 .side-menu，pointer-events:none 不拦截交互 */
+         /* 各层微扩 inset:-1px 覆盖容器边缘亚像素缝隙，由父级 overflow:hidden 统一裁剪圆角 */
          .menu-layer-base,
          .menu-layer-light,
          .menu-layer-acrylic,
          .menu-layer-texture {
             position: absolute;
-            inset: 0;
-            border-radius: 12px;
+            inset: -1px;          /* 比容器多 1px，消除模糊层边缘渲染缝隙 */
             pointer-events: none;
+            /* 不设 border-radius：由 .side-menu 的 overflow:hidden 统一裁剪 */
          }
 
          /* 底层（z-index:7）：最轻亚克力底衬，云母色的主要来源 */
@@ -419,13 +419,14 @@
             background: rgba(0, 0, 0, 0.03);
          }
 
-         /* 第4层（z-index:8）：内部体积光，跟随鼠标（复用父级 --rx/ry 变量，无需新增事件监听）*/
+         /* 第4层（z-index:8）：内部体积光，跟随鼠标（复用父级 --rx/ry 变量，无需新增事件监听）
+            不指定圆半径 → 浏览器以 farthest-corner 为准，自然衰减无硬边界 */
          .menu-layer-light {
             z-index: 8;
             background: radial-gradient(
-               150px circle at var(--rx, -9999px) var(--ry, -9999px),
-               rgba(var(--reveal-hi,  255, 0, 0), 0.11),
-               rgba(var(--reveal-mid, 180, 30, 30), 0.055) 45%,
+               circle at var(--rx, -9999px) var(--ry, -9999px),
+               rgba(var(--reveal-hi,  255, 0, 0), 0.09)  0%,
+               rgba(var(--reveal-mid, 180, 30, 30), 0.04) 40%,
                transparent 70%
             );
          }
@@ -648,7 +649,8 @@
 
          /* ==================== floating-btn 悬停发光（M2 移除 boxShadow='none' 后生效）==================== */
          body.is-desktop .floating-btn:hover {
-            box-shadow: 0 0 18px 5px rgba(var(--toggle-hi, 255, 0, 0), 0.40),
+            /* --toggle-glow 由 JS updateProgress 预构建完整 rgba() 字符串写入，避免 rgba(var(), alpha) 解析歧义 */
+            box-shadow: 0 0 20px 6px var(--toggle-glow, rgba(255, 0, 0, 0.45)),
                         0 6px 24px rgba(0, 0, 0, 0.45);
             transition: box-shadow 0.25s ease;
          }
@@ -1432,6 +1434,15 @@
             const m = bg.match(/rgba\([^)]+,\s*([\d.]+)\s*\)/);
             return !(m && parseFloat(m[1]) < 0.05);
           }
+          // 判断颜色是否有足够饱和度（过滤灰色/黑色/白色背景，这些没有有效色彩信息）
+          function hasSaturation(rgb) {
+            const [r, g, b] = rgb;
+            const max = Math.max(r, g, b), min = Math.min(r, g, b);
+            const l = (max + min) / 510;  // 归一化 L
+            if (l < 0.05 || l > 0.95) return false;  // 过暗或过亮（接近纯黑/纯白）
+            const s = l > 0.5 ? (max - min) / (510 - max - min) : (max - min) / (max + min);
+            return s > 0.12;  // 饱和度阈值 12%，过滤无彩色
+          }
           function rgbToHsl(r, g, b) {
             r /= 255; g /= 255; b /= 255;
             const max = Math.max(r, g, b), min = Math.min(r, g, b);
@@ -1500,13 +1511,15 @@
 
               const [h, s, l] = rgbToHsl(rA, gA, bA);
 
-              // HSL 偏移：+17% 亮度 → 光效色；-17% 亮度 → 深色层；饱和度略降 → mid/right
-              const lHi    = clamp(l + 17, 0, 100);
-              const lDark  = clamp(l - 17, 0, 100);
+              // HSL 偏移：+45% 亮度 → 光效高亮色；-45% 亮度 → 深色层
+              // mid 比 hi 低 20% L，制造肉眼可辨的渐变层次；饱和度略降使过渡更自然
+              const lHi    = clamp(l + 45, 0, 100);
+              const lMid   = clamp(lHi - 20, 0, 100);  // 明显低于 hi，确保渐变可见
+              const lDark  = clamp(l - 45, 0, 100);
               const sDim   = s * 0.82;
 
-              const rgbHi    = hslToRgb(h, s,   lHi);
-              const rgbMid   = hslToRgb(h, sDim, lHi);
+              const rgbHi    = hslToRgb(h, s,    lHi);
+              const rgbMid   = hslToRgb(h, sDim, lMid); // 低亮度版，与 hi 形成对比
               const rgbDarkL = hslToRgb(h, s,   lDark);
               const rgbDarkR = hslToRgb(h, sDim, clamp(lDark + 3, 0, 100));
 
@@ -1514,6 +1527,13 @@
               document.body.style.setProperty('--reveal-mid',      rgbMid.join(', '));
               document.body.style.setProperty('--mica-dark-left',  rgbDarkL.join(', '));
               document.body.style.setProperty('--mica-dark-right', rgbDarkR.join(', '));
+
+              // Mica 联动 floating-btn：写入插值端点，由 updateProgress 负责按进度插值
+              // --mica-btn-dark: 初始色（原 0,0,0 位置）；--mica-btn-hi: 最亮色（原 255,0,0 位置）
+              _micaBtnDark = rgbDarkL;   // 模块级变量，供 updateProgress 读取
+              _micaBtnHi   = rgbHi;
+              _micaActive  = true;       // 告知 updateProgress 使用 Mica 端点而非硬编码
+              updateProgress();          // 立即以新端点刷新一次按钮颜色
             } catch (_) {
               // 静默降级：跨域 SecurityError 或其他异常，保留 CSS 变量现有默认值
             }
@@ -1556,13 +1576,13 @@
 
         // --- 菜单控制（UI 层操作 + 调用各模块接口）---
         async function openMenu() {
+          state.isWheelScrolling = false;        // 防御：关/开菜单之间若 debounce 尚未触发，复位屏蔽标志
+          // M5 Fix3: 必须在菜单显示之前采样，否则菜单覆盖视口，只能采到菜单自身的灰色
+          await micaSampler.sample();
           sideMenuWrapper.classList.add('active');
           sideMenu.classList.add('active');
           menuMask.classList.add('active');
-          menuToggle.style.display = 'none';    // 同步隐藏按钮，防止重复点击
-          state.isWheelScrolling = false;        // 防御：关/开菜单之间若 debounce 尚未触发，复位屏蔽标志
-          // M5: Mica 采样（写 --reveal-hi/mid 等变量）；必须在 reveal.resizeCanvas() 之前
-          await micaSampler.sample();
+          menuToggle.style.display = 'none';
           highlighter.syncToMenu();
           if (isDesktop) {
             reveal.resizeCanvas();               // 读取颜色缓存（在 Mica 之后）
@@ -1633,42 +1653,69 @@
           closeMenu();
         });
 
-        // ==================== 10. 滚动进度指示器（保持原样）====================
-        // 缓存上次写入的 redValue，避免值未变时重复触发 style 写入
-        let _lastRedValue = -1;
+        // ==================== 10. 滚动进度指示器 ====================
+        // _lastBgValue:  缓存上次写入的背景色 R 值，避免未变时重复 style 写入
+        // _micaActive:   Mica 采样成功后置 true，updateProgress 改用 Mica 端点插值
+        // _micaBtnDark:  Mica 深色端点 [r,g,b]（替代硬编码 0,0,0）
+        // _micaBtnHi:    Mica 亮色端点 [r,g,b]（替代硬编码 255,0,0）
+        let _lastBgValue = -1;
+        let _micaActive  = false;
+        let _micaBtnDark = [0,   0,   0];
+        let _micaBtnHi   = [255, 0,   0];
 
         function updateProgress() {
-          const scrollHeight   = document.documentElement.scrollHeight - window.innerHeight;
-          const scrollPercent  = scrollHeight > 0 ? Math.min(window.scrollY / scrollHeight, 1) : 0;
-          const redValue       = Math.floor(scrollPercent * 255);
+          const scrollHeight  = document.documentElement.scrollHeight - window.innerHeight;
+          const scrollPercent = scrollHeight > 0 ? Math.min(window.scrollY / scrollHeight, 1) : 0;
+          const t = scrollPercent;   // 0（顶部）→ 1（底部）
 
-          if (redValue !== _lastRedValue) {
-            _lastRedValue = redValue;
-            menuToggle.style.backgroundColor = `rgb(${redValue}, 0, 0)`;
-            // ⚠️ 不再写 boxShadow，让 CSS :hover 规则正常生效（M7 依赖此修复）
+          // 按钮背景色：在 dark/hi 两端点之间按进度插值
+          const [dr, dg, db] = _micaBtnDark;
+          const [hr, hg, hb] = _micaBtnHi;
+          const bgR = Math.round(dr + (hr - dr) * t);
+          const bgG = Math.round(dg + (hg - dg) * t);
+          const bgB = Math.round(db + (hb - db) * t);
+          // 用合并值做脏检测（避免三通道各自比较）
+          const bgPacked = (bgR << 16) | (bgG << 8) | bgB;
+          if (bgPacked !== _lastBgValue) {
+            _lastBgValue = bgPacked;
+            menuToggle.style.backgroundColor = `rgb(${bgR}, ${bgG}, ${bgB})`;
+            // 背景始终为深色系，字色固定白色保证可读性（日间/夜间均适用）
+            menuToggle.style.color = '#fff';
           }
 
-          const isLight    = _isLightMode;   // 读缓存，避免每次 scroll 触发 classList 查询
-          const fadeRatio  = 1 - scrollPercent;
+          // --toggle-hi/mid/glow：Mica 端点插值（Mica 激活）或主题硬编码插值（降级）
           let hiColor, midColor;
-          if (isLight) {
-            const r  = Math.round(20  + 60  * fadeRatio);
-            const g  = Math.round(20  + 60  * fadeRatio);
-            const b  = Math.round(60  + 120 * fadeRatio);
-            const r2 = Math.round(15  + 45  * fadeRatio);
-            const b2 = Math.round(50  + 110 * fadeRatio);
-            hiColor  = `${r}, ${g}, ${b}`;
-            midColor = `${r2}, ${g}, ${b2}`;
+          if (_micaActive) {
+            // Mica 模式：hi 端（最亮）直接用 _micaBtnHi，mid 端用中间值
+            hiColor  = `${hr}, ${hg}, ${hb}`;
+            const mr = Math.round(dr + (hr - dr) * 0.5);
+            const mg = Math.round(dg + (hg - dg) * 0.5);
+            const mb = Math.round(db + (hb - db) * 0.5);
+            midColor = `${mr}, ${mg}, ${mb}`;
           } else {
-            const gb    = Math.round(255 * (1 - fadeRatio));
-            const midR  = Math.round(180 * fadeRatio + 255 * (1 - fadeRatio));
-            const midGB = Math.round(gb * 0.5);
-            hiColor  = `255, ${gb}, ${gb}`;
-            midColor = `${midR}, ${midGB}, ${midGB}`;
+            // 硬编码降级：与原逻辑一致
+            const isLight   = _isLightMode;
+            const fadeRatio = 1 - t;
+            if (isLight) {
+              const r  = Math.round(20  + 60  * fadeRatio);
+              const g  = Math.round(20  + 60  * fadeRatio);
+              const b  = Math.round(60  + 120 * fadeRatio);
+              const r2 = Math.round(15  + 45  * fadeRatio);
+              const b2 = Math.round(50  + 110 * fadeRatio);
+              hiColor  = `${r}, ${g}, ${b}`;
+              midColor = `${r2}, ${g}, ${b2}`;
+            } else {
+              const gb    = Math.round(255 * (1 - fadeRatio));
+              const midR  = Math.round(180 * fadeRatio + 255 * (1 - fadeRatio));
+              const midGB = Math.round(gb * 0.5);
+              hiColor  = `255, ${gb}, ${gb}`;
+              midColor = `${midR}, ${midGB}, ${midGB}`;
+            }
           }
-          // 直接写 CSS 变量，避免每帧重新解析整段样式规则
-          document.body.style.setProperty('--toggle-hi',  hiColor);
-          document.body.style.setProperty('--toggle-mid', midColor);
+          // --toggle-glow: 预构建完整 rgba()，避免 rgba(var(),alpha) 跨浏览器解析歧义
+          document.body.style.setProperty('--toggle-hi',   hiColor);
+          document.body.style.setProperty('--toggle-mid',  midColor);
+          document.body.style.setProperty('--toggle-glow', `rgba(${hiColor}, 0.45)`);
         }
 
         window.addEventListener('scroll', updateProgress, { passive: true });
