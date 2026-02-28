@@ -485,7 +485,8 @@
          .menu-left {
             position: relative;
             z-index: 11;            /* 覆盖在 .menu-layer-* (z-index 7-10) 之上 */
-            width: 200px;
+            flex: 1;                /* 自动填充 menu-right 之外的剩余空间，无需随 --menu-right-width 手动同步 */
+            min-width: 0;           /* 防止 flex 子元素溢出父容器 */
             padding: 20px;
             overflow-y: auto;
             scrollbar-width: none;
@@ -1021,6 +1022,13 @@
             if (Math.abs(target - chapterListEl.scrollTop) < 1) return Promise.resolve();
 
             state.programmaticScrollCount++;
+            // instant 滚动同帧完成，smoothScrollPromise 轮询会误判为"未启动"并等待 300ms。
+            // 在此处单独处理：同步执行 scrollTo 后直接 resolve，保持 count 语义正确。
+            if (behavior === 'instant') {
+              chapterListEl.scrollTo({ top: target, behavior: 'instant' });
+              state.programmaticScrollCount--;
+              return Promise.resolve();
+            }
             return smoothScrollPromise(
               () => chapterListEl.scrollTo({ top: target, behavior }),
               () => chapterListEl.scrollTop
@@ -1986,7 +1994,7 @@
           sideMenu.classList.remove('active');
           menuMask.classList.remove('active');
           menuToggle.style.display = 'flex';
-          if (isDesktop) {
+          if (isDesktop && reveal) {
             reveal.detachScrollListener();  // 仅移除 canvas scroll 监听，保留 menuToggle Reveal
             reveal.clearAllReveal();
           }
@@ -2030,7 +2038,7 @@
 
         toBottomBtn.addEventListener('click', (e) => {
           e.stopPropagation();
-          window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+          window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
           closeMenu();
         });
 
