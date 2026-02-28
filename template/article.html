@@ -339,6 +339,7 @@
             z-index: 999;
             display: none;
             pointer-events: none;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.28);
          }
    
          .side-menu-wrapper.active {
@@ -415,16 +416,20 @@
 
          /* 底层（z-index:7）：唯一的 backdrop-filter 层。
             border-radius 故意比父容器（12px）少 1px，确保模糊层完全被
-            .side-menu 的 overflow:hidden 裁切，消除 WebKit 亚像素圆角渗色。 */
+            .side-menu 的 overflow:hidden 裁切，消除 WebKit 亚像素圆角渗色。
+            背景色：Mica 生效时使用 --mica-dark-left（采样色亮度 -17%），
+            未生效时回落到硬编码默认值，保证零视觉差降级。 */
          .menu-layer-base {
             z-index: 7;
             border-radius: 11px;
-            background: rgba(18, 18, 18, 0.55);
+            /* C1: 使用 --mica-dark-left，fallback 与原硬编码值一致 */
+            background: rgba(var(--mica-dark-left, 18, 18, 18), 0.55);
             backdrop-filter: blur(7px);
             -webkit-backdrop-filter: blur(7px);
          }
+         /* C2: light-mode fallback 与原 rgba(255,255,255,0.55) 一致 */
          body.light-mode .menu-layer-base {
-            background: rgba(255, 255, 255, 0.55);
+            background: rgba(var(--mica-dark-left, 255, 255, 255), 0.55);
          }
 
          /* 第4层（z-index:8）：内部体积光，跟随鼠标，纯渐变无 backdrop-filter */
@@ -535,14 +540,16 @@
             min-height: 100%;
             display: flex;
             flex-direction: column;
-            background: rgba(0, 0, 0, 0.2);
+            /* C3: 使用 --mica-dark-right，fallback 与原 rgba(0,0,0,0.2) 一致 */
+            background: rgba(var(--mica-dark-right, 0, 0, 0), 0.2);
             border-left: 1px solid rgba(255, 255, 255, 0.15);
             transition: background 0.5s ease, border-color 0.5s ease;
             flex-shrink: 0;
          }
    
+         /* C4: light-mode fallback 与原 rgba(0,0,0,0.05) 一致 */
          body.light-mode .menu-right {
-            background: rgba(0, 0, 0, 0.05);
+            background: rgba(var(--mica-dark-right, 0, 0, 0), 0.05);
             border-left-color: rgba(0, 0, 0, 0.1);
          }
    
@@ -662,11 +669,6 @@
             box-shadow: 0 0 20px 6px var(--toggle-glow, rgba(255, 0, 0, 0.45)),
                         0 6px 24px rgba(0, 0, 0, 0.45);
             transition: box-shadow 0.25s ease;
-         }
-
-         /* ==================== 菜单容器阴影 ==================== */
-         .side-menu-wrapper {
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.28);
          }
    
          .header, .floating-btn, .side-menu, .comments {
@@ -881,27 +883,6 @@
         // ==================== 6. 章节高亮器 ====================
 
         /**
-         * 菜单驱动文章滚动的公共路径：
-         *   - 维护 menuDrivingArticleCount，防止滚动期间 updateActiveHeading 干扰高亮
-         *   - 滚动结束后调用 onFinally(scrolled: boolean) 以便调用方继续状态机流转
-         * @param {string}   id        目标 heading 的 id
-         * @param {function} onFinally (scrolled: boolean) => void，在 finally 块中调用
-         */
-        function driveArticleScroll(id, onFinally) {
-          const heading = document.getElementById(id);
-          if (!heading) { onFinally(false); return; }
-          state.menuDrivingArticleCount++;
-          smoothScrollPromise(
-            () => heading.scrollIntoView({ behavior: 'smooth', block: 'start' }),
-            () => window.scrollY
-          ).finally(() => {
-            state.menuDrivingArticleCount--;
-            onFinally(true);
-          });
-        }
-
-
-        /**
          * 封装了"章节 item 构建 + 高亮状态机"的全部逻辑。
          * 对外暴露三个接口：
          *   init(onItemClick)  - 构建 DOM、绑定事件，传入点击 item 后的回调
@@ -914,6 +895,10 @@
           const menuScrollDebounce  = createDebounce(onMenuScrollDebounced,  400);
 
           let allHeadings = [];
+          // J3: id → element Map，O(1) 查找，替代 querySelector
+          let _itemMap = new Map();
+          // J3: 章节项元素列表缓存，供 getCenteredItemId 使用
+          let allItems = [];
           // 缓存当前持有 .current / .hovered 的 DOM 元素，避免每次 setHighlight 调用 querySelectorAll
           let _currentHighlightEl = null;
 
@@ -923,14 +908,15 @@
             return el ? el.closest('.chapter-item') : null;
           }
 
-          // 唯一高亮入口：直接操作缓存引用，避免全量 querySelectorAll
+          // J4: 唯一高亮入口：_currentHighlightEl 避免移除时的 querySelector，
+          //     _itemMap 避免添加时的 querySelector
           function setHighlight(id) {
             if (_currentHighlightEl) {
               _currentHighlightEl.classList.remove('current', 'hovered');
               _currentHighlightEl = null;
             }
             if (!id) return;
-            const item = chapterListEl.querySelector(`.chapter-item[data-id="${id}"]`);
+            const item = _itemMap.get(id);
             if (item) {
               item.classList.add(state.activeState === 'scroll' ? 'current' : 'hovered');
               _currentHighlightEl = item;
@@ -939,7 +925,8 @@
 
           // 滚动菜单让指定 item 居中（返回 Promise，避免硬编码超时）
           function scrollMenuToItem(id, behavior = 'smooth') {
-            const item = chapterListEl.querySelector(`.chapter-item[data-id="${id}"]`);
+            // J4: 使用 Map 替代 querySelector
+            const item = _itemMap.get(id);
             if (!item) return Promise.resolve();
             const target = item.offsetTop - (chapterListEl.clientHeight - item.offsetHeight) / 2;
             if (chapterListEl.scrollHeight <= chapterListEl.clientHeight) return Promise.resolve();
@@ -951,18 +938,37 @@
             ).finally(() => { state.programmaticScrollCount--; });
           }
 
-          // 找到当前菜单可视区中心最近的 item
+          // J4: 找到当前菜单可视区中心最近的 item，使用缓存列表替代 querySelectorAll
           function getCenteredItemId() {
-            const items      = chapterListEl.querySelectorAll('.chapter-item');
             const containerR = chapterListEl.getBoundingClientRect();
             const centerY    = containerR.top + containerR.height / 2;
             let best = null, bestDist = Infinity;
-            items.forEach(item => {
+            allItems.forEach(item => {
               const r    = item.getBoundingClientRect();
               const dist = Math.abs(r.top + r.height / 2 - centerY);
               if (dist < bestDist) { bestDist = dist; best = item; }
             });
             return best ? best.dataset.id : null;
+          }
+
+          // J2: driveArticleScroll 移入闭包内部，消除全局作用域污染。
+          //     使用闭包内的 state（与参数同名，无需额外传参）。
+          /**
+           * 菜单驱动文章滚动的公共路径：
+           *   - 维护 menuDrivingArticleCount，防止滚动期间 updateActiveHeading 干扰高亮
+           *   - 滚动结束后调用 onFinally(scrolled: boolean) 以便调用方继续状态机流转
+           */
+          function driveArticleScroll(id, onFinally) {
+            const heading = document.getElementById(id);
+            if (!heading) { onFinally(false); return; }
+            state.menuDrivingArticleCount++;
+            smoothScrollPromise(
+              () => heading.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+              () => window.scrollY
+            ).finally(() => {
+              state.menuDrivingArticleCount--;
+              onFinally(true);
+            });
           }
 
           // --- 状态：scroll ---
@@ -1121,6 +1127,9 @@
               });
 
               chapterListEl.appendChild(listItem);
+              // J3: 构建缓存，供 setHighlight / scrollMenuToItem / getCenteredItemId 使用
+              _itemMap.set(heading.id, listItem);
+              allItems.push(listItem);
             });
 
             if (allHeadings.length > 0) {
@@ -1235,9 +1244,6 @@
           let cachedTargetRects = null; // Map<el, DOMRect>
           // ⑤ sideMenu rect 缓存：光照光层坐标基准（整个菜单含 menu-right），由 resizeCanvas 更新
           let cachedSideMenuRect = null;
-          // ⑥ 菜单打开动画进行中标志：动画期间 getBoundingClientRect 返回变换中坐标，禁止重建缓存
-          let isMenuAnimating = false;
-
           const isMenuActive = () => menuWrapperEl.classList.contains('active');
 
           /** 刷新 target rect 缓存。alwaysOn 元素始终缓存；其余只在菜单激活时才有有效位置。 */
@@ -1462,9 +1468,12 @@
          * 路B：DOM 元素 backgroundColor + color（覆盖无图片场景）
          * 优先使用有色彩的颜色（hasChroma），全部无彩时退回均值。
          * 任何异常（含跨域 canvas 污染）静默降级，保留 CSS 变量默认值。
+         *
+         * J6: 采样结果通过 onComplete(btnDark, btnHi) 回调传出，
+         *     不再直接写入外部变量，保持工厂函数纯粹、可复用。
          * 对外暴露：sample() → Promise<void>
          */
-        function createMicaSampler() {
+        function createMicaSampler({ onComplete }) {
 
           // ── 工具函数 ──────────────────────────────────────────
           function parseRgba(str) {
@@ -1532,13 +1541,14 @@
                      r.right  > 0 && r.left < vw;
             });
             if (imgs.length === 0) return null;
-            // 面积最大的图片代表性最强
-            imgs.sort((a, b) => {
-              const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
-              return (rb.width * rb.height) - (ra.width * ra.height);
+            // J5: sort 前预计算 rect，避免 comparator 内反复 reflow（O(n log n) 次 → O(n) 次）
+            const withArea = imgs.map(img => {
+              const r = img.getBoundingClientRect();
+              return { img, area: r.width * r.height };
             });
+            withArea.sort((a, b) => b.area - a.area);
             try {
-              const img = imgs[0];
+              const img = withArea[0].img;
               const SIZE = 40;
               const offscreen = document.createElement('canvas');
               offscreen.width = SIZE; offscreen.height = SIZE;
@@ -1615,7 +1625,7 @@
 
               const [h, s, l] = rgbToHsl(rA, gA, bA);
 
-              // 相对亮度 ±45%（HSL L 通道）
+              // 相对亮度 ±15%（HSL L 通道）
               const lHi   = clamp(l + 15, 0, 100);
               const lDark = clamp(l - 15, 0, 100);
               const lMid  = clamp(lHi - 8, 0, 100);
@@ -1628,16 +1638,14 @@
 
               document.body.style.setProperty('--reveal-hi',       rgbHi.join(', '));
               document.body.style.setProperty('--reveal-mid',      rgbMid.join(', '));
+              // C1/C2/C3/C4: 写入 CSS 变量供 .menu-layer-base 和 .menu-right 使用
               document.body.style.setProperty('--mica-dark-left',  rgbDarkL.join(', '));
               document.body.style.setProperty('--mica-dark-right', rgbDarkR.join(', '));
 
-              // 联动 floating-btn 端点，updateProgress 按进度插值
-              _micaBtnDark = rgbDarkL;
-              _micaBtnHi   = rgbHi;
-              _micaActive  = true;
-              updateProgress();
+              // J6: 通过回调传出结果，不直接写入外部变量
+              onComplete(rgbDarkL, rgbHi);
             } catch (_) {
-              // 静默降级
+              // 静默降级：CSS 变量保持默认值，onComplete 不调用，_micaActive 保持 false
             }
           }
 
@@ -1656,8 +1664,27 @@
           state,
         });
 
-        // --- Mica 采样器（M5）---
-        const micaSampler = createMicaSampler();
+        // J8: updateProgress 中 Mica 模式下 --toggle-hi/mid 固定为采样色端点，
+        //     不随滚动进度 t 变化——这是设计有意为之（Mica 色相驱动，非进度驱动）。
+        // _lastBgValue:  缓存上次写入的背景色打包值，避免未变时重复 style 写入
+        // _micaActive:   Mica 采样成功后置 true，updateProgress 改用 Mica 端点
+        // _micaBtnDark:  Mica 深色端点 [r,g,b]（替代硬编码 0,0,0）
+        // _micaBtnHi:    Mica 亮色端点 [r,g,b]（替代硬编码 255,0,0）
+        let _lastBgValue = -1;
+        let _micaActive  = false;
+        let _micaBtnDark = [0,   0,   0];
+        let _micaBtnHi   = [255, 0,   0];
+
+        // --- Mica 采样器（J6: 通过 onComplete 回调写入外部状态）---
+        // J7: 传入 onComplete，在采样成功后更新模块级变量并触发进度指示器刷新
+        const micaSampler = createMicaSampler({
+          onComplete(btnDark, btnHi) {
+            _micaBtnDark = btnDark;
+            _micaBtnHi   = btnHi;
+            _micaActive  = true;
+            updateProgress();
+          }
+        });
 
         /**
          * buildMenuLayers（M6）：向 .side-menu 注入五层结构 DOM。
@@ -1688,6 +1715,8 @@
           menuToggle.style.display = 'none';
           highlighter.syncToMenu();
           if (isDesktop) {
+            // J9: reveal 在 initRevealEffect 赋值后方可调用，此处加 null guard 防御极端时序
+            if (!reveal) return;
             reveal.resizeCanvas();               // 读取颜色缓存（在 Mica 之后）
             reveal.attachScrollListener();
           }
@@ -1758,14 +1787,6 @@
         });
 
         // ==================== 10. 滚动进度指示器 ====================
-        // _lastBgValue:  缓存上次写入的背景色 R 值，避免未变时重复 style 写入
-        // _micaActive:   Mica 采样成功后置 true，updateProgress 改用 Mica 端点插值
-        // _micaBtnDark:  Mica 深色端点 [r,g,b]（替代硬编码 0,0,0）
-        // _micaBtnHi:    Mica 亮色端点 [r,g,b]（替代硬编码 255,0,0）
-        let _lastBgValue = -1;
-        let _micaActive  = false;
-        let _micaBtnDark = [0,   0,   0];
-        let _micaBtnHi   = [255, 0,   0];
 
         function updateProgress() {
           const scrollHeight  = document.documentElement.scrollHeight - window.innerHeight;
@@ -1787,10 +1808,12 @@
             menuToggle.style.color = '#fff';
           }
 
-          // --toggle-hi/mid/glow：Mica 端点插值（Mica 激活）或主题硬编码插值（降级）
+          // J8: --toggle-hi/mid/glow 的计算逻辑说明：
+          //   · Mica 模式：hi/mid 固定为采样色端点（设计有意为之，颜色由 Mica 色相决定，非滚动进度）
+          //   · 降级模式：hi/mid 随滚动进度在主题硬编码色值之间插值
           let hiColor, midColor;
           if (_micaActive) {
-            // Mica 模式：hi 端（最亮）直接用 _micaBtnHi，mid 端用中间值
+            // Mica 模式：hi 端直接用 _micaBtnHi，mid 端取两端中间值
             hiColor  = `${hr}, ${hg}, ${hb}`;
             const mr = Math.round(dr + (hr - dr) * 0.5);
             const mg = Math.round(dg + (hg - dg) * 0.5);
