@@ -297,8 +297,8 @@
             outline: none;
             color: #fff;
             background: rgba(20, 20, 20, 0.55);
-            backdrop-filter: blur(20px) saturate(180%);
-            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
             transition: background 0.3s ease, border-color 0.3s ease;
          }
 
@@ -320,8 +320,7 @@
             width: 100%;
             height: 100%;
             background-color: rgba(0, 0, 0, 0.3);
-            backdrop-filter: blur(2px);
-            -webkit-backdrop-filter: blur(2px);
+            /* backdrop-filter 已移除：对遮罩层模糊会产生偏蓝光晕，且与菜单层 backdrop-filter 叠加后色偏加重 */
             z-index: 998;
             display: none;
             transition: opacity 0.3s ease;
@@ -408,21 +407,23 @@
             pointer-events: none;
          }
 
-         /* 底层（z-index:7）：最轻亚克力底衬，云母色的主要来源 */
+         /* 底层（z-index:7）：亚克力底衬，提供基础不透明度避免遮罩颜色透过 */
          .menu-layer-base {
             z-index: 7;
-            background: rgba(255, 255, 255, 0.03);
-            backdrop-filter: blur(3px);
-            -webkit-backdrop-filter: blur(3px);
+            background: rgba(18, 18, 18, 0.55);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border-radius: 12px;    /* 自裁剪，不依赖父级 overflow:hidden */
          }
          body.light-mode .menu-layer-base {
-            background: rgba(0, 0, 0, 0.03);
+            background: rgba(255, 255, 255, 0.55);
          }
 
          /* 第4层（z-index:8）：内部体积光，跟随鼠标（复用父级 --rx/ry 变量，无需新增事件监听）
             不指定圆半径 → 浏览器以 farthest-corner 为准，自然衰减无硬边界 */
          .menu-layer-light {
             z-index: 8;
+            border-radius: 12px;
             background: radial-gradient(
                circle at var(--rx, -9999px) var(--ry, -9999px),
                rgba(var(--reveal-hi,  255, 0, 0), 0.09)  0%,
@@ -437,6 +438,7 @@
             background: rgba(255, 255, 255, 0.07);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
+            border-radius: 12px;
             opacity: 0.5;
          }
          body.light-mode .menu-layer-acrylic {
