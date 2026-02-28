@@ -470,9 +470,20 @@
             background: rgba(0, 0, 0, 0.03);
          }
 
-         /* 第2层（z-index:10）：斑驳质感预留槽，暂无内容 */
+         /* 第2层（z-index:10）：斑驳质感层
+            · SVG（feTurbulence + feDisplacementMap + feComposite）由 JS 动态注入
+            · mix-blend-mode: overlay  在夜间模式下呈现金属做旧感
+            · opacity 由 JS 写入 --texture-opacity，主题切换时跟随更新        */
          .menu-layer-texture {
             z-index: 10;
+            mix-blend-mode: overlay;
+            opacity: var(--texture-opacity, 0.07);
+            border-radius: 11px;
+            overflow: hidden;
+         }
+         body.light-mode .menu-layer-texture {
+            mix-blend-mode: soft-light;
+            opacity: var(--texture-opacity, 0.06);
          }
 
          /* ==================== 菜单左侧：章节列表 ==================== */
@@ -1479,7 +1490,143 @@
         }
 
 
-        // ==================== 8. Mica 颜色采样器 ====================
+        // ==================== 8. 斑驳质感绘制器 ====================
+        /**
+         * createTexturePainter
+         * 负责向 .menu-layer-texture 注入 SVG 斑驳质感，并管理其生命周期。
+         *
+         * 质感构成（三层叠加）：
+         *   ① 噪点底层   feTurbulence(fractalNoise) + feColorMatrix 灰度化
+         *   ② 划痕层     随机贝塞尔曲线路径，模拟拉丝/划痕
+         *   ③ 边缘磨损层 径向渐变遮罩，四角更重
+         *
+         * 再生时机：
+         *   · markDirty()      → 仅置 _dirty = true（绑定到 scroll，零开销）
+         *   · paintIfNeeded()  → _dirty 时才真正重建，供 openMenu() 调用
+         *
+         * 对外暴露：markDirty() / paintIfNeeded() / paint()
+         */
+        function createTexturePainter({ layerEl }) {
+          let _dirty = true;   // 初始需要绘制一次
+
+          // ── 随机工具 ──────────────────────────────────────────────
+          function rand(min, max) { return min + Math.random() * (max - min); }
+          function randInt(min, max) { return Math.floor(rand(min, max + 1)); }
+
+          // ── 生成单条划痕路径（SVG path d 字符串）─────────────────
+          // 起点随机落在四边，终点偏向对侧，中途有贝塞尔弯折
+          function makeScratchPath(w, h) {
+            const edge = randInt(0, 3);
+            let x0, y0;
+            switch (edge) {
+              case 0: x0 = rand(0, w);  y0 = 0;          break;
+              case 1: x0 = w;           y0 = rand(0, h);  break;
+              case 2: x0 = rand(0, w);  y0 = h;           break;
+              default:x0 = 0;           y0 = rand(0, h);  break;
+            }
+            const diag   = Math.sqrt(w * w + h * h);
+            const length = rand(diag * 0.15, diag * 0.60);
+            const angle  = rand(0, Math.PI * 2);
+            const x1     = x0 + Math.cos(angle) * length;
+            const y1     = y0 + Math.sin(angle) * length;
+            const cpx    = (x0 + x1) / 2 + rand(-30, 30);
+            const cpy    = (y0 + y1) / 2 + rand(-30, 30);
+            return `M${x0.toFixed(1)},${y0.toFixed(1)} Q${cpx.toFixed(1)},${cpy.toFixed(1)} ${x1.toFixed(1)},${y1.toFixed(1)}`;
+          }
+
+          // ── 生成完整 SVG 字符串 ───────────────────────────────────
+          function buildSVG(w, h, isLight) {
+            const noiseSeed    = randInt(0, 9999);
+
+            // 划痕数量：金属质感多，亚克力少
+            const scratchCount = isLight ? randInt(3, 7) : randInt(6, 14);
+            const scratches    = Array.from({ length: scratchCount }, () => makeScratchPath(w, h));
+
+            // 划痕粗细与透明度：日间细而淡，夜间略粗略重
+            const scratchW     = isLight ? rand(0.3, 0.8)  : rand(0.5, 1.5);
+            const scratchAlpha = isLight ? rand(0.25, 0.45): rand(0.35, 0.60);
+
+            // 噪点频率：日间细腻，夜间粗粒
+            const noiseFreqX   = isLight ? rand(0.55, 0.80): rand(0.35, 0.55);
+            const noiseFreqY   = isLight ? rand(0.55, 0.80): rand(0.35, 0.55);
+            const noiseOctave  = isLight ? 4 : 3;
+
+            // 噪点填充色：日间浅灰（亚克力），夜间中灰（金属）
+            const noiseFill    = isLight ? 'rgba(200,200,210,0.18)' : 'rgba(160,160,170,0.22)';
+
+            // 边缘磨损：夜间暗晕（氧化感），日间亮晕（边缘反光）
+            const edgeColor    = isLight ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.65)';
+            const edgeAlpha    = isLight ? 0.50 : 0.60;
+
+            // 划痕颜色：日间白色高光，夜间浅银色
+            const scratchColor = isLight
+              ? `rgba(255,255,255,${scratchAlpha.toFixed(2)})`
+              : `rgba(220,220,230,${scratchAlpha.toFixed(2)})`;
+
+            const filterId = `tex-${noiseSeed}`;
+            const gradId   = `edge-${noiseSeed}`;
+
+            const defs = `<defs>
+    <filter id="${filterId}" x="0%" y="0%" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise"
+        baseFrequency="${noiseFreqX.toFixed(3)} ${noiseFreqY.toFixed(3)}"
+        numOctaves="${noiseOctave}" seed="${noiseSeed}" result="noise"/>
+      <feColorMatrix type="saturate" values="0" in="noise" result="grayNoise"/>
+      <feBlend in="grayNoise" in2="SourceGraphic" mode="overlay"/>
+    </filter>
+    <radialGradient id="${gradId}" cx="50%" cy="50%" rx="68%" ry="62%">
+      <stop offset="0%"   stop-color="${edgeColor}" stop-opacity="0"/>
+      <stop offset="60%"  stop-color="${edgeColor}" stop-opacity="${(edgeAlpha * 0.3).toFixed(2)}"/>
+      <stop offset="100%" stop-color="${edgeColor}" stop-opacity="${edgeAlpha.toFixed(2)}"/>
+    </radialGradient>
+  </defs>`;
+
+            const noiseRect    = `<rect width="${w}" height="${h}" fill="${noiseFill}" filter="url(#${filterId})"/>`;
+            const scratchPaths = scratches.map(d =>
+              `<path d="${d}" stroke="${scratchColor}" stroke-width="${scratchW.toFixed(2)}" fill="none" stroke-linecap="round"/>`
+            ).join('\n      ');
+            const edgeRect     = `<rect width="${w}" height="${h}" fill="url(#${gradId})"/>`;
+
+            return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" style="display:block">${defs}${noiseRect}<g>${scratchPaths}</g>${edgeRect}</svg>`;
+          }
+
+          // ── 公开接口 ──────────────────────────────────────────────
+
+          /** 标记需要重新生成（绑定到 scroll 事件，零开销） */
+          function markDirty() { _dirty = true; }
+
+          /** 仅在 _dirty 时重建 SVG，供 openMenu() 调用 */
+          function paintIfNeeded() {
+            if (!_dirty) return;
+            paint();
+          }
+
+          /** 强制重建 SVG */
+          function paint() {
+            _dirty = false;
+            const w = layerEl.offsetWidth  || layerEl.parentElement?.offsetWidth  || 250;
+            const h = layerEl.offsetHeight || layerEl.parentElement?.offsetHeight || 400;
+            const isLight = document.body.classList.contains('light-mode');
+            const svgStr  = buildSVG(w, h, isLight);
+
+            // 用 DOMParser 替换而非 innerHTML，避免 XSS 及序列化副作用
+            const parser  = new DOMParser();
+            const parsed  = parser.parseFromString(svgStr, 'image/svg+xml');
+            const newSvg  = parsed.documentElement;
+            const existing = layerEl.querySelector('svg');
+            if (existing) {
+              layerEl.replaceChild(document.importNode(newSvg, true), existing);
+            } else {
+              layerEl.appendChild(document.importNode(newSvg, true));
+            }
+          }
+
+          return { markDirty, paintIfNeeded, paint };
+        }
+
+
+        // ==================== 9. Mica 颜色采样器 ====================
+
         /**
          * Mica 颜色采样器：两路合并方案
          * 路A：视口内可见 <img> 元素 → 离屏 canvas getImageData（真实像素，权重×3）
@@ -1688,7 +1835,7 @@
 
 
 
-        // ==================== 9. 主初始化 ====================
+        // ==================== 10. 主初始化 ====================
 
         // --- 创建高亮器（此时 closeMenu 尚未定义，通过回调注入）---
         const highlighter = createChapterHighlighter({
@@ -1738,6 +1885,15 @@
         }
         buildMenuLayers();
 
+        // --- 斑驳质感绘制器 ---
+        // buildMenuLayers 执行后 .menu-layer-texture 已存在于 DOM
+        const texturePainter = createTexturePainter({
+          layerEl: sideMenu.querySelector('.menu-layer-texture'),
+        });
+
+        // 文章滚动时标记脏位（零开销），下次 openMenu() 才真正重建
+        window.addEventListener('scroll', () => texturePainter.markDirty(), { passive: true });
+
         // --- 菜单控制（UI 层操作 + 调用各模块接口）---
         async function openMenu() {
           state.isWheelScrolling = false;        // 防御：关/开菜单之间若 debounce 尚未触发，复位屏蔽标志
@@ -1747,6 +1903,8 @@
           sideMenu.classList.add('active');
           menuMask.classList.add('active');
           menuToggle.style.display = 'none';
+          // 质感层：按需重建（滚动后 _dirty=true 时才重新生成 SVG）
+          texturePainter.paintIfNeeded();
           highlighter.syncToMenu();
           if (isDesktop) {
             // J9: reveal 在 initRevealEffect 赋值后方可调用，此处加 null guard 防御极端时序
@@ -1820,7 +1978,7 @@
           closeMenu();
         });
 
-        // ==================== 10. 滚动进度指示器 ====================
+        // ==================== 11. 滚动进度指示器 ====================
 
         function updateProgress() {
           const scrollHeight  = document.documentElement.scrollHeight - window.innerHeight;
