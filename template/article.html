@@ -506,10 +506,9 @@
          display: flex;
       }
 
-      /* ==================== 菜单五层材质结构（z-index 7-10，由 JS buildMenuLayers 注入 DOM）==================== */
+      /* ==================== 菜单四层材质结构（z-index 7-10，由 JS buildMenuLayers 注入 DOM）==================== */
       .menu-layer-base,
       .menu-layer-light,
-      .menu-layer-acrylic,
       .menu-layer-texture {
          position: absolute;
          inset: 0;
@@ -546,45 +545,18 @@
       /* 第4层（z-index:8）：内部体积光，跟随鼠标，纯渐变无 backdrop-filter。
             颜色使用专用的 --volume-light（由 Mica 采样器计算，与 Reveal 边框光的
             --reveal-hi 独立，两者色相相同但亮度/饱和度偏移规则不同）。
-            fallback 值对应夜间模式降级状态（深红体积光）。
-
-            两层叠加 + blur（A 方案）：
-              无明显热核，中心到边缘过渡平缓，整体呈漫射柔光而非聚光斑。
-              filter: blur(6px) 抹平渐变边缘的最后一点锯齿，让光自然晕开。
-            mix-blend-mode: screen（C 方案）：
-              光与下层玻璃底色屏幕混合，产生"光从材质内部散出"的感觉。
-              日间切换为 soft-light，避免浅色背景下过曝。 */
+            fallback 值对应夜间模式降级状态（深红体积光）。 */
       .menu-layer-light {
          z-index: 8;
-         mix-blend-mode: screen;
-         filter: blur(6px);
-         background:
-            radial-gradient(90px circle at var(--lx, -9999px) var(--ly, -9999px),
-               rgba(var(--volume-light, 180, 0, 0), 0.048) 0%,
-               rgba(var(--volume-light, 180, 0, 0), 0.022) 40%,
-               rgba(var(--volume-light, 180, 0, 0), 0.006) 75%,
-               transparent 100%),
-            radial-gradient(140px circle at var(--lx, -9999px) var(--ly, -9999px),
-               rgba(var(--volume-light, 180, 0, 0), 0.014) 0%,
-               rgba(var(--volume-light, 180, 0, 0), 0.004) 55%,
+         background: radial-gradient(75px circle at var(--lx, -9999px) var(--ly, -9999px),
+               rgba(var(--volume-light, 180, 0, 0), 0.055) 0%,
+               rgba(var(--volume-light, 180, 0, 0), 0.03) 30%,
+               rgba(var(--volume-light, 180, 0, 0), 0.008) 60%,
+               rgba(var(--volume-light, 180, 0, 0), 0) 85%,
                transparent 100%);
       }
 
-      body.light-mode .menu-layer-light {
-         mix-blend-mode: soft-light;
-      }
-
-      /* 第3层（z-index:9）：过渡层，纯色半透明，不使用 backdrop-filter */
-      .menu-layer-acrylic {
-         z-index: 9;
-         background: rgba(255, 255, 255, 0.05);
-      }
-
-      body.light-mode .menu-layer-acrylic {
-         background: rgba(0, 0, 0, 0.03);
-      }
-
-      /* 第2层（z-index:10）：斑驳质感层
+/* 第2层（z-index:10）：斑驳质感层
             · SVG（feTurbulence + feDisplacementMap + feComposite）由 JS 动态注入
             · mix-blend-mode: overlay  在夜间模式下呈现金属做旧感
             · opacity 由 JS 写入 --texture-opacity，主题切换时跟随更新        */
@@ -2147,14 +2119,14 @@
         });
 
         /**
-         * buildMenuLayers：向 .side-menu 注入五层结构 DOM。
+         * buildMenuLayers：向 .side-menu 注入三层材质结构 DOM（base / light / texture）。
          * 幂等设计：检测 .menu-layer-base 是否已存在，防止重复插入。
          * 在初始化阶段执行一次，菜单关闭/打开不会重新创建。
          */
         function buildMenuLayers() {
           if (sideMenu.querySelector('.menu-layer-base')) return;
           const fragment = document.createDocumentFragment();
-          ['base', 'light', 'acrylic', 'texture'].forEach(name => {
+          ['base', 'light', 'texture'].forEach(name => {
             const layer = document.createElement('div');
             layer.className = `menu-layer-${name}`;
             fragment.appendChild(layer);
