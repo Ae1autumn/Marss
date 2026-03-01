@@ -1,20 +1,21 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 
-   <head>
+<head>
 
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-      <title>{{ article.title }} - {{ blog.name }}</title>
-      <link rel="icon" href="{{ blog.favicon }}">
-      <!--
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>{{ article.title }} - {{ blog.name }}</title>
+   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+   <link rel="icon" href="{{ blog.favicon }}">
+   <!--
         FOUC 防闪修复：在任何渲染发生前，检查 localStorage 与服务端主题是否冲突。
         优先级：localStorage > 服务端配置值。
         若两者不同，提前注入临时样式覆盖背景色/字色，避免页面加载时的主题闪烁。
         applyTheme() 执行完毕后会移除此临时样式。
       -->
-      <script>
-        (function () {
+   <script>
+      (function () {
           var saved      = localStorage.getItem('theme');
           var serverMode = "{{ blog.theme.mode }}";
           // 没有 localStorage 值，直接用服务端渲染的 class，无需任何干预
@@ -26,743 +27,877 @@
             : 'body { background-color: #121212 !important; color: #fff !important; }';
           document.head.appendChild(style);
         })();
-      </script>
-      <style>
-         /* ==================== 基础样式 ==================== */
-         html {
-            overflow-x: hidden;
-         }
+   </script>
+   <style>
+      /* ==================== 基础样式 ==================== */
+      *,
+      *::before,
+      *::after {
+         box-sizing: border-box;
+      }
 
-         *, *::before, *::after {
-            box-sizing: border-box;
-         }
-   
-         * {
-            margin: 0;
-            padding: 0;
-         }
-   
-         body {
-            --menu-right-width: 50px;   /* Q5: menu-right 宽度单一来源，.menu-layer-base 渐变分割点引用此值 */
-            background-color: #121212;
-            color: #fff;
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            padding: 20px;
-            max-width: 1000px;
-            margin: 0 auto;
-            transition: background-color 0.5s ease, color 0.5s ease;
-            overflow-wrap: break-word;
-            word-break: break-word;
-         }
-   
-         /* ==================== 主题颜色变量 ==================== */
-         body.dark-mode {
-            background-color: #121212;
-            color: #ffffff;
-            --reveal-hi:  255, 0, 0;
-            --reveal-mid: 180, 30, 30;
-         }
-   
-         body.light-mode {
-            background-color: #fff;
-            color: #000;
-            --reveal-hi:  80, 80, 180;
-            --reveal-mid: 60, 60, 160;
-         }
-   
-         body.dark-mode .header { border-bottom-color: #333; }
-         body.dark-mode .title { color: #fff; }
-         body.dark-mode .summary { color: #ccc; }
-         body.dark-mode .date { color: #999; }
-         body.dark-mode .tag { background-color: #333; color: #fff; }
-         body.dark-mode h1, body.dark-mode h2, body.dark-mode h3,
-         body.dark-mode h4, body.dark-mode h5, body.dark-mode h6 {
-            border-bottom-color: #333;
-            color: #fff;
-         }
-         body.dark-mode .comments { border-top-color: #333; }
-   
-         body.light-mode .header { border-bottom-color: #ddd; }
-         body.light-mode .title { color: #000; }
-         body.light-mode .summary { color: #666; }
-         body.light-mode .date { color: #777; }
-         body.light-mode .tag { background-color: #eee; color: #000; }
-         body.light-mode h1, body.light-mode h2, body.light-mode h3,
-         body.light-mode h4, body.light-mode h5, body.light-mode h6 {
-            border-bottom-color: #ddd;
-            color: #000;
-         }
-         body.light-mode .comments { border-top-color: #ddd; }
-   
-         /* ==================== Reveal ::before 公共结构 ==================== */
-         .side-menu-wrapper::before,
-         .menu-right::before,
-         .floating-btn::before {
-            content: '';
-            position: absolute;
-            inset: -1px;
-            padding: 1px;
-            -webkit-mask:
-               linear-gradient(#fff 0 0) content-box,
-               linear-gradient(#fff 0 0);
-            -webkit-mask-composite: xor;
-            mask-composite: exclude;
-            pointer-events: none;
-            z-index: 2;
-         }
-   
-         /* ==================== 文章内容样式 ==================== */
-         .header {
-            margin-bottom: 9px;
-            padding: 20px;
-            padding-bottom: 3px;
-            border-bottom: 1px solid #333;
-            transition: border-color 0.5s ease;
-         }
-   
-         .title {
-            font-size: 2.5rem;
-            margin-bottom: 3px;
-            color: #fff;
-            transition: color 0.5s ease;
-         }
-   
-         .summary {
-            font-size: 1.1rem;
-            margin-bottom: 3px;
-            color: #ccc;
-            transition: color 0.5s ease;
-         }
-   
-         .date {
-            color: #999;
-            font-size: 0.9rem;
-            margin-bottom: 3px;
-            transition: color 0.5s ease;
-         }
-   
-         .tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-bottom: 3px;
-         }
-   
-         .tag {
-            background-color: #333;
-            color: #fff;
-            padding: 2px 10px;
-            border-radius: 3px;
-            font-size: 0.9rem;
-            transition: background-color 0.5s ease, color 0.5s ease;
-         }
-   
-         .content {
-            padding: 20px;
-            padding-top: 0px;
-            margin-bottom: 50px;
-            overflow-x: hidden;
-         }
-   
-         /* ==================== Markdown内容样式 ==================== */
-         .content p {
-            margin-top: 0;
-            margin-bottom: 0.3em;
-            line-height: 1.5;
-         }
-   
-         .content h1, .content h2, .content h3,
-         .content h4, .content h5, .content h6 {
-            margin: 1.5em 0 0.5em;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #333;
-            transition: border-color 0.5s ease, color 0.5s ease;
-         }
-   
-         .content ul, .content ol {
-            margin: 0.8em 0;
-            padding-left: 2em;
-         }
-   
-         .content li {
-            margin: 0.3em 0;
-            line-height: 1.6;
-         }
-   
-         .content pre {
-            margin: 1em 0;
-            padding: 1em;
-            background-color: #f5f5f5;
-            border-radius: 4px;
-            overflow-x: auto;
-            white-space: pre;
-            max-width: 100%;
-         }
-   
-         body.dark-mode  .content pre { background-color: #2d2d2d; color: #f8f8f2; }
-         body.light-mode .content pre { background-color: #f5f5f5; color: #333; }
-   
-         .content code {
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            font-size: 0.9em;
-         }
-   
-         .content p code {
-            background-color: #f5f5f5;
-            padding: 0.2em 0.4em;
-            border-radius: 3px;
-         }
-   
-         body.dark-mode .content p code { background-color: #3a3a3a; color: #f8f8f2; }
-         body.light-mode .content p code { background-color: #eef0f2; color: #333; }
-   
-         .content blockquote {
-            margin: 1em 0;
-            padding: 0.5em 1em;
-            border-left: 4px solid #ddd;
-            background-color: #f9f9f9;
-            color: #666;
-            border-radius: 5px;
-         }
-   
-         body.dark-mode .content blockquote { border-left-color: #555; background-color: #2a2a2a; color: #ccc; }
-   
-         .table-wrapper { overflow-x: auto; margin: 20px 0; max-width: 100%; }
-   
-         .content table {
-            margin: 1em 0;
-            border-collapse: collapse;
-            width: 100%;
-            max-width: 100%;
-         }
-   
-         .content th, .content td {
-            border: 1px solid #ddd;
-            padding: 0.5em 1em;
-            text-align: left;
-            max-width: 300px;
-         }
-   
-         .content th { background-color: #f5f5f5; font-weight: 600; }
-         body.dark-mode .content th { background-color: #333; border-color: #444; }
-         body.dark-mode .content td { border-color: #444; }
-   
-         .content img { max-width: 100%; height: auto; margin: 1em 0; border-radius: 4px; display: block; }
-         .content hr { margin: 2em 0; border: none; border-top: 1px solid #ddd; }
-         body.dark-mode .content hr { border-top-color: #444; }
-   
-         .content a {
-            color: #4da6ff;
-            text-decoration: none;
-            border-bottom: 1px dotted rgba(77, 166, 255, 0.5);
-            transition: all 0.3s ease;
-         }
-   
-         body.dark-mode .content a { color: #6bb8ff; border-bottom: 1px dotted rgba(107, 184, 255, 0.5); }
-   
-         .content a:hover {
-            color: #fff;
-            border-bottom: 1px solid rgba(77, 166, 255, 0.8);
-            background-color: rgba(77, 166, 255, 0.1);
-         }
-   
-         body.dark-mode .content a:hover {
-            color: #fff;
-            border-bottom: 1px solid rgba(107, 184, 255, 0.8);
-            background-color: rgba(107, 184, 255, 0.1);
-         }
+      * {
+         margin: 0;
+         padding: 0;
+      }
 
-         body.light-mode .content a:hover {
-            color: #000;
-         }
-   
-         /* ==================== 评论区 ==================== */
-         .comments {
-            margin-top: 50px;
-            padding: 20px;
-            border-top: 1px solid #333;
-            transition: border-color 0.5s ease;
-         }
-   
-         /* ==================== 亚克力浮动按钮 ==================== */
-         .floating-btn {
-            position: fixed;
-            bottom: max(30px, calc(env(safe-area-inset-bottom) + 10px));
-            right: 30px;
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-            font-size: 24px;
-            z-index: 1000;
-            border: 1px solid rgba(255, 255, 255, 0.12); /* 移动端可见 */
-            outline: none;
-            color: #fff;
-            background: rgba(20, 20, 20, 0.55);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            transition: background 0.3s ease, border-color 0.3s ease;
-         }
+      body {
+         --menu-right-width: 50px;
+         /* Q5: menu-right 宽度单一来源，.menu-layer-base 渐变分割点引用此值 */
+         background-color: #121212;
+         color: #fff;
+         font-family: Arial, sans-serif;
+         line-height: 1.6;
+         padding: 20px;
+         max-width: 1000px;
+         margin: 0 auto;
+         position: relative;
+         transition: background-color 0.5s ease, color 0.5s ease;
+         overflow-x: hidden;
+         word-wrap: break-word;
+         word-break: break-word;
+         overflow-wrap: break-word;
+      }
 
-         body.is-desktop .floating-btn {
-            border: none;
-         }
+      /* ==================== 主题颜色变量 ==================== */
+      body.dark-mode {
+         background-color: #121212;
+         color: #ffffff;
+         --reveal-hi: 255, 0, 0;
+         --reveal-mid: 180, 30, 30;
+      }
 
-         body.light-mode .floating-btn {
-            background: rgba(255, 255, 255, 0.55);
-            border-color: rgba(0, 0, 0, 0.1);
-            color: #000;
-         }
-   
-         /* ==================== 遮罩 ==================== */
-         .menu-mask {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.3);
-            backdrop-filter: blur(2px);
-            -webkit-backdrop-filter: blur(2px);
-            z-index: 998;
+      body.light-mode {
+         background-color: #fff;
+         color: #000;
+         --reveal-hi: 80, 80, 180;
+         --reveal-mid: 60, 60, 160;
+      }
+
+      body.dark-mode .header {
+         border-bottom-color: #333;
+      }
+
+      body.dark-mode .title {
+         color: #fff;
+      }
+
+      body.dark-mode .summary {
+         color: #ccc;
+      }
+
+      body.dark-mode .date {
+         color: #999;
+      }
+
+      body.dark-mode .tag {
+         background-color: #333;
+         color: #fff;
+      }
+
+      body.dark-mode h1,
+      body.dark-mode h2,
+      body.dark-mode h3,
+      body.dark-mode h4,
+      body.dark-mode h5,
+      body.dark-mode h6 {
+         border-bottom-color: #333;
+         color: #fff;
+      }
+
+      body.dark-mode .comments {
+         border-top-color: #333;
+      }
+
+      body.light-mode .header {
+         border-bottom-color: #ddd;
+      }
+
+      body.light-mode .title {
+         color: #000;
+      }
+
+      body.light-mode .summary {
+         color: #666;
+      }
+
+      body.light-mode .date {
+         color: #777;
+      }
+
+      body.light-mode .tag {
+         background-color: #eee;
+         color: #000;
+      }
+
+      body.light-mode h1,
+      body.light-mode h2,
+      body.light-mode h3,
+      body.light-mode h4,
+      body.light-mode h5,
+      body.light-mode h6 {
+         border-bottom-color: #ddd;
+         color: #000;
+      }
+
+      body.light-mode .comments {
+         border-top-color: #ddd;
+      }
+
+      /* ==================== Reveal ::before 公共结构 ==================== */
+      .side-menu-wrapper::before,
+      .menu-right::before,
+      .floating-btn::before {
+         content: '';
+         position: absolute;
+         inset: -1px;
+         padding: 1px;
+         -webkit-mask:
+            linear-gradient(#fff 0 0) content-box,
+            linear-gradient(#fff 0 0);
+         -webkit-mask-composite: xor;
+         mask-composite: exclude;
+         pointer-events: none;
+         z-index: 2;
+      }
+
+      /* ==================== 文章内容样式 ==================== */
+      .header {
+         margin-bottom: 9px;
+         padding: 20px;
+         padding-bottom: 3px;
+         border-bottom: 1px solid #333;
+         transition: border-color 0.5s ease;
+      }
+
+      .title {
+         font-size: 2.5rem;
+         margin-bottom: 3px;
+         color: #fff;
+         transition: color 0.5s ease;
+      }
+
+      .summary {
+         font-size: 1.1rem;
+         margin-bottom: 3px;
+         color: #ccc;
+         transition: color 0.5s ease;
+      }
+
+      .date {
+         color: #999;
+         font-size: 0.9rem;
+         margin-bottom: 3px;
+         transition: color 0.5s ease;
+      }
+
+      .tags {
+         display: flex;
+         flex-wrap: wrap;
+         gap: 10px;
+         margin-bottom: 3px;
+      }
+
+      .tag {
+         background-color: #333;
+         color: #fff;
+         padding: 2px 10px;
+         border-radius: 3px;
+         font-size: 0.9rem;
+         transition: background-color 0.5s ease, color 0.5s ease;
+      }
+
+      .content {
+         padding: 20px;
+         padding-top: 0px;
+         margin-bottom: 50px;
+         transition: color 0.5s ease;
+         overflow-x: hidden;
+      }
+
+      /* ==================== Markdown内容样式 ==================== */
+      .content p {
+         margin-top: 0;
+         margin-bottom: 0.3em;
+         line-height: 1.5;
+      }
+
+      .content h1,
+      .content h2,
+      .content h3,
+      .content h4,
+      .content h5,
+      .content h6 {
+         margin: 1.5em 0 0.5em;
+         padding-bottom: 10px;
+         border-bottom: 1px solid #333;
+         transition: border-color 0.5s ease, color 0.5s ease;
+      }
+
+      .content ul,
+      .content ol {
+         margin: 0.8em 0;
+         padding-left: 2em;
+      }
+
+      .content li {
+         margin: 0.3em 0;
+         line-height: 1.6;
+      }
+
+      .content pre {
+         margin: 1em 0;
+         padding: 1em;
+         background-color: #f5f5f5;
+         border-radius: 4px;
+         overflow-x: auto;
+         white-space: pre;
+         max-width: 100%;
+      }
+
+      body.dark-mode .content pre {
+         background-color: #2d2d2d;
+         color: #f8f8f2;
+      }
+
+      body.light-mode .content pre {
+         background-color: #f5f5f5;
+         color: #333;
+      }
+
+      .content code {
+         font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+         font-size: 0.9em;
+      }
+
+      .content p code {
+         background-color: #f5f5f5;
+         padding: 0.2em 0.4em;
+         border-radius: 3px;
+      }
+
+      body.dark-mode .content p code {
+         background-color: #3a3a3a;
+         color: #f8f8f2;
+      }
+
+      .content blockquote {
+         margin: 1em 0;
+         padding: 0.5em 1em;
+         border-left: 4px solid #ddd;
+         background-color: #f9f9f9;
+         color: #666;
+         border-radius: 5px;
+      }
+
+      body.dark-mode .content blockquote {
+         border-left-color: #555;
+         background-color: #2a2a2a;
+         color: #ccc;
+      }
+
+      .table-wrapper {
+         overflow-x: auto;
+         margin: 20px 0;
+         max-width: 100%;
+      }
+
+      .content table {
+         margin: 1em 0;
+         border-collapse: collapse;
+         width: 100%;
+         max-width: 100%;
+      }
+
+      .content th,
+      .content td {
+         border: 1px solid #ddd;
+         padding: 0.5em 1em;
+         text-align: left;
+         max-width: 300px;
+      }
+
+      .content th {
+         background-color: #f5f5f5;
+         font-weight: 600;
+      }
+
+      body.dark-mode .content th {
+         background-color: #333;
+         border-color: #444;
+      }
+
+      body.dark-mode .content td {
+         border-color: #444;
+      }
+
+      .content img {
+         max-width: 100%;
+         height: auto;
+         margin: 1em 0;
+         border-radius: 4px;
+         display: block;
+      }
+
+      .content hr {
+         margin: 2em 0;
+         border: none;
+         border-top: 1px solid #ddd;
+      }
+
+      .content a {
+         color: #4da6ff;
+         text-decoration: none;
+         border-bottom: 1px dotted rgba(77, 166, 255, 0.5);
+         transition: all 0.3s ease;
+      }
+
+      body.dark-mode .content a {
+         color: #6bb8ff;
+         border-bottom: 1px dotted rgba(107, 184, 255, 0.5);
+      }
+
+      .content a:hover {
+         color: #fff;
+         border-bottom: 1px solid rgba(77, 166, 255, 0.8);
+         background-color: rgba(77, 166, 255, 0.1);
+      }
+
+      body.dark-mode .content a:hover {
+         color: #fff;
+         border-bottom: 1px solid rgba(107, 184, 255, 0.8);
+         background-color: rgba(107, 184, 255, 0.1);
+      }
+
+      /* ==================== 评论区 ==================== */
+      .comments {
+         margin-top: 50px;
+         padding: 20px;
+         border-top: 1px solid #333;
+         transition: border-color 0.5s ease;
+      }
+
+      /* ==================== 亚克力浮动按钮 ==================== */
+      .floating-btn {
+         position: fixed;
+         bottom: 30px;
+         right: 30px;
+         width: 60px;
+         height: 60px;
+         border-radius: 50%;
+         display: flex;
+         justify-content: center;
+         align-items: center;
+         cursor: pointer;
+         font-size: 24px;
+         z-index: 1000;
+         border: 1px solid rgba(255, 255, 255, 0.12);
+         /* 移动端可见 */
+         outline: none;
+         color: #fff;
+         background: rgba(20, 20, 20, 0.55);
+         backdrop-filter: blur(20px);
+         -webkit-backdrop-filter: blur(20px);
+         transition: background 0.3s ease, border-color 0.3s ease;
+      }
+
+      body.is-desktop .floating-btn {
+         border: none;
+      }
+
+      body.light-mode .floating-btn {
+         background: rgba(255, 255, 255, 0.55);
+         border-color: rgba(0, 0, 0, 0.1);
+         color: #000;
+      }
+
+      /* ==================== 遮罩 ==================== */
+      .menu-mask {
+         position: fixed;
+         top: 0;
+         left: 0;
+         width: 100%;
+         height: 100%;
+         background-color: rgba(0, 0, 0, 0.3);
+         backdrop-filter: blur(2px);
+         -webkit-backdrop-filter: blur(2px);
+         z-index: 998;
+         display: none;
+         transition: opacity 0.3s ease;
+      }
+
+      .menu-mask.active {
+         display: block;
+      }
+
+      /* ==================== 亚克力侧边菜单 wrapper ==================== */
+      .side-menu-wrapper {
+         position: fixed;
+         bottom: 30px;
+         right: 30px;
+         width: 250px;
+         height: 400px;
+         max-width: calc(100vw - 60px);
+         border-radius: 12px;
+         z-index: 999;
+         display: none;
+         pointer-events: none;
+         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.28);
+      }
+
+      .side-menu-wrapper.active {
+         display: block;
+         animation: menuAppear 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+      }
+
+      @keyframes menuAppear {
+         0% {
+            transform: scale(0.1);
             opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.3s ease, visibility 0.3s ease;
          }
-         .menu-mask.active { opacity: 1; visibility: visible; }
-   
-         /* ==================== 亚克力侧边菜单 wrapper ==================== */
-         .side-menu-wrapper {
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            width: 250px;
-            height: 400px;
-            max-height: calc(100vh - 60px);
-            max-width: calc(100vw - 60px);
-            border-radius: 12px;
-            z-index: 999;
-            display: none;
-            pointer-events: none;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.28);
+
+         100% {
+            transform: scale(1);
+            opacity: 1;
          }
-   
-         .side-menu-wrapper.active {
-            display: block;
-            bottom: max(30px, calc(env(safe-area-inset-bottom) + 10px));
-            animation: menuAppear 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55);
-         }
-   
-         @keyframes menuAppear {
-            0%   { transform: scale(0.1); opacity: 0; }
-            100% { transform: scale(1);   opacity: 1; }
-         }
-   
-         /* Reveal 边框层 - 仅桌面端显示 */
-         .side-menu-wrapper::before {
-            border-radius: inherit;
-            background: radial-gradient(
-               150px circle at var(--rx, -9999px) var(--ry, -9999px),
-               rgba(var(--reveal-hi),  0.95),
+      }
+
+      /* Reveal 边框层 - 仅桌面端显示 */
+      .side-menu-wrapper::before {
+         border-radius: inherit;
+         background: radial-gradient(150px circle at var(--rx, -9999px) var(--ry, -9999px),
+               rgba(var(--reveal-hi), 0.95),
                rgba(var(--reveal-mid), 0.45) 45%,
-               transparent 70%
-            );
-            opacity: 0;
-         }
-   
-         body.is-desktop .side-menu-wrapper::before {
-            opacity: var(--ro, 1);
-         }
-   
-         /* ==================== 亚克力侧边菜单 ==================== */
-         .side-menu {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            border-radius: 12px;
-            display: none;
-            flex-direction: row;
-            overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.18);
-            pointer-events: auto;
-            transform: translateZ(0);
-            isolation: isolate;
-            transition: border-color 0.5s ease;
-         }
+               transparent 70%);
+         opacity: 0;
+      }
 
-         body.light-mode .side-menu {
-            border-color: rgba(0, 0, 0, 0.12);
-            outline-color: rgba(0, 0, 0, 0.12);
-         }
+      body.is-desktop .side-menu-wrapper::before {
+         opacity: var(--ro, 1);
+      }
 
-         body.is-desktop .side-menu {
-            border: none;
-            outline: none;
-         }
-   
-         .side-menu.active {
-            display: flex;
-         }
-   
-         /* ==================== 菜单五层材质结构（z-index 7-10，由 JS buildMenuLayers 注入 DOM）==================== */
-         .menu-layer-base,
-         .menu-layer-light,
-         .menu-layer-acrylic,
-         .menu-layer-texture {
-            position: absolute;
-            inset: 0;
-            pointer-events: none;
-         }
+      /* ==================== 亚克力侧边菜单 ==================== */
+      .side-menu {
+         position: relative;
+         width: 100%;
+         height: 100%;
+         border-radius: 12px;
+         display: none;
+         flex-direction: row;
+         overflow: hidden;
+         border: 1px solid rgba(255, 255, 255, 0.18);
+         pointer-events: auto;
+         transform: translateZ(0);
+         isolation: isolate;
+         transition: border-color 0.5s ease;
+      }
 
-         /* 底层（z-index:7）：唯一的 backdrop-filter 层。
+      body.light-mode .side-menu {
+         border-color: rgba(0, 0, 0, 0.12);
+         outline-color: rgba(0, 0, 0, 0.12);
+      }
+
+      body.is-desktop .side-menu {
+         border: none;
+         outline: none;
+      }
+
+      .side-menu.active {
+         display: flex;
+      }
+
+      /* ==================== 菜单五层材质结构（z-index 7-10，由 JS buildMenuLayers 注入 DOM）==================== */
+      .menu-layer-base,
+      .menu-layer-light,
+      .menu-layer-acrylic,
+      .menu-layer-texture {
+         position: absolute;
+         inset: 0;
+         pointer-events: none;
+      }
+
+      /* 底层（z-index:7）：唯一的 backdrop-filter 层。
             border-radius 故意比父容器（12px）少 1px，确保模糊层完全被
             .side-menu 的 overflow:hidden 裁切，消除 WebKit 亚像素圆角渗色。
             背景色：左侧（menu-left 区域）使用亮色 --reveal-hi，
                     右侧（menu-right 区域）使用暗色 --mica-dark-right，
             分割点固定在距右边 50px（menu-right 宽度）处。
             Mica 未生效时回落到硬编码默认值。 */
-         .menu-layer-base {
-            z-index: 7;
-            border-radius: 11px;
-            background: linear-gradient(
-               to right,
-               rgba(var(--mica-dark-left,  18, 18, 18), 0.55) 0%,
-               rgba(var(--mica-dark-left,  18, 18, 18), 0.55) calc(100% - var(--menu-right-width)),
-               rgba(var(--mica-dark-right,  0,  0,  0), 0.55) calc(100% - var(--menu-right-width)),
-               rgba(var(--mica-dark-right,  0,  0,  0), 0.55) 100%
-            );
-            backdrop-filter: blur(7px);
-            -webkit-backdrop-filter: blur(7px);
-         }
-         body.light-mode .menu-layer-base {
-            background: linear-gradient(
-               to right,
-               rgba(var(--mica-dark-left,  255, 255, 255), 0.55) 0%,
-               rgba(var(--mica-dark-left,  255, 255, 255), 0.55) calc(100% - var(--menu-right-width)),
-               rgba(var(--mica-dark-right, 220, 220, 220), 0.55) calc(100% - var(--menu-right-width)),
-               rgba(var(--mica-dark-right, 220, 220, 220), 0.55) 100%
-            );
-         }
+      .menu-layer-base {
+         z-index: 7;
+         border-radius: 11px;
+         background: linear-gradient(to right,
+               rgba(var(--mica-dark-left, 18, 18, 18), 0.55) 0%,
+               rgba(var(--mica-dark-left, 18, 18, 18), 0.55) calc(100% - var(--menu-right-width)),
+               rgba(var(--mica-dark-right, 0, 0, 0), 0.55) calc(100% - var(--menu-right-width)),
+               rgba(var(--mica-dark-right, 0, 0, 0), 0.55) 100%);
+         backdrop-filter: blur(7px);
+         -webkit-backdrop-filter: blur(7px);
+      }
 
-         /* 第4层（z-index:8）：内部体积光，跟随鼠标，纯渐变无 backdrop-filter。
+      body.light-mode .menu-layer-base {
+         background: linear-gradient(to right,
+               rgba(var(--mica-dark-left, 255, 255, 255), 0.55) 0%,
+               rgba(var(--mica-dark-left, 255, 255, 255), 0.55) calc(100% - var(--menu-right-width)),
+               rgba(var(--mica-dark-right, 220, 220, 220), 0.55) calc(100% - var(--menu-right-width)),
+               rgba(var(--mica-dark-right, 220, 220, 220), 0.55) 100%);
+      }
+
+      /* 第4层（z-index:8）：内部体积光，跟随鼠标，纯渐变无 backdrop-filter。
             颜色使用专用的 --volume-light（由 Mica 采样器计算，与 Reveal 边框光的
             --reveal-hi 独立，两者色相相同但亮度/饱和度偏移规则不同）。
             fallback 值对应夜间模式降级状态（深红体积光）。 */
-         .menu-layer-light {
-            z-index: 8;
-            background: radial-gradient(
-               75px circle at var(--lx, -9999px) var(--ly, -9999px),
+      .menu-layer-light {
+         z-index: 8;
+         background: radial-gradient(75px circle at var(--lx, -9999px) var(--ly, -9999px),
                rgba(var(--volume-light, 180, 0, 0), 0.055) 0%,
-               rgba(var(--volume-light, 180, 0, 0), 0.03)  30%,
+               rgba(var(--volume-light, 180, 0, 0), 0.03) 30%,
                rgba(var(--volume-light, 180, 0, 0), 0.008) 60%,
-               rgba(var(--volume-light, 180, 0, 0), 0)     85%,
-               transparent 100%
-            );
-         }
+               rgba(var(--volume-light, 180, 0, 0), 0) 85%,
+               transparent 100%);
+      }
 
-         /* 第3层（z-index:9）：过渡层，纯色半透明，不使用 backdrop-filter */
-         .menu-layer-acrylic {
-            z-index: 9;
-            background: rgba(255, 255, 255, 0.05);
-         }
-         body.light-mode .menu-layer-acrylic {
-            background: rgba(0, 0, 0, 0.03);
-         }
+      /* 第3层（z-index:9）：过渡层，纯色半透明，不使用 backdrop-filter */
+      .menu-layer-acrylic {
+         z-index: 9;
+         background: rgba(255, 255, 255, 0.05);
+      }
 
-         /* 第2层（z-index:10）：斑驳质感层
+      body.light-mode .menu-layer-acrylic {
+         background: rgba(0, 0, 0, 0.03);
+      }
+
+      /* 第2层（z-index:10）：斑驳质感层
             · SVG（feTurbulence + feDisplacementMap + feComposite）由 JS 动态注入
             · mix-blend-mode: overlay  在夜间模式下呈现金属做旧感
             · opacity 由 JS 写入 --texture-opacity，主题切换时跟随更新        */
-         .menu-layer-texture {
-            z-index: 10;
-            mix-blend-mode: overlay;
-            opacity: var(--texture-opacity, 0.07);
-            border-radius: 11px;
-            overflow: hidden;
-         }
-         body.light-mode .menu-layer-texture {
-            mix-blend-mode: soft-light;
-            opacity: var(--texture-opacity, 0.06);
-         }
+      .menu-layer-texture {
+         z-index: 10;
+         mix-blend-mode: overlay;
+         opacity: var(--texture-opacity, 0.07);
+         border-radius: 11px;
+         overflow: hidden;
+      }
 
-         /* ==================== 菜单左侧：章节列表 ==================== */
-         .menu-left {
-            position: relative;
-            z-index: 11;            /* 覆盖在 .menu-layer-* (z-index 7-10) 之上 */
-            flex: 1;                /* 自动填充 menu-right 之外的剩余空间，无需随 --menu-right-width 手动同步 */
-            min-width: 0;           /* 防止 flex 子元素溢出父容器 */
-            padding: 20px;
-            overflow-y: auto;
-            scrollbar-width: none;
-            background: transparent;
-         }
-   
-         .menu-left::-webkit-scrollbar { display: none; }
-   
+      body.light-mode .menu-layer-texture {
+         mix-blend-mode: soft-light;
+         opacity: var(--texture-opacity, 0.06);
+      }
 
-         /* Canvas 叠加层 */
-         #menuRevealCanvas {
-            position: fixed;
-            pointer-events: none;
-            z-index: 1001;
-            opacity: 0;
-            transition: opacity 0.2s;
-         }
-         #menuRevealCanvas.active { opacity: 1; }
-   
-         /* ==================== 章节项 ==================== */
-         .chapter-item {
-            display: flex;
-            align-items: center;
-            padding: 10px 0;
-            cursor: pointer;
-            color: rgba(var(--reveal-mid, 180, 30, 30), 0.7);
-            transition: color 0.2s, padding-left 0.2s;
-            position: relative;
-         }
-   
-         .chapter-item::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 7px;
-            right: 7px;
-            height: 1px;
-            transform: scaleY(0.5);
-            transform-origin: bottom;
-            background: rgba(255, 255, 255, 0.05);
-            transition: opacity 0.3s;
-         }
-   
-         body.light-mode .chapter-item::after {
-            background: rgba(0, 0, 0, 0.3);
-         }
-   
-         body.is-desktop .chapter-item::after {
-            opacity: 0;
-         }
-   
-         .chapter-item:last-child::after { display: none; }
-   
-         .chapter-item.h1-item { padding-left: 0; }
-         .chapter-item.h2-item { padding-left: 14px; color: rgba(var(--reveal-mid, 180, 30, 30), 0.65); font-size: 0.9em; }
-         .chapter-item.h3-item { padding-left: 28px; color: rgba(var(--reveal-mid, 180, 30, 30), 0.45); font-size: 0.85em; }
-   
-         body.light-mode .chapter-item { color: rgba(var(--reveal-mid, 60, 60, 160), 0.7); }
-         body.light-mode .chapter-item.h2-item { color: rgba(var(--reveal-mid, 60, 60, 160), 0.45); }
-         body.light-mode .chapter-item.h3-item { color: rgba(var(--reveal-mid, 60, 60, 160), 0.3); }
-   
-         body.is-desktop .chapter-item:hover { color: rgba(var(--reveal-hi), 1); }
-         body.is-desktop .chapter-item.h1-item:hover { padding-left: 5px; }
-         body.is-desktop .chapter-item.h2-item:hover { padding-left: 19px; }
-         body.is-desktop .chapter-item.h3-item:hover { padding-left: 33px; }
-   
-         .chapter-item.current { color: rgba(var(--reveal-hi), 1) !important; }
-         .chapter-item.hovered { color: rgba(var(--reveal-hi), 1) !important; }
-   
-         /* ==================== 菜单右侧：按钮区 ==================== */
-         .menu-right {
-            position: relative;
-            z-index: 11;            /* 同上，覆盖在 .menu-layer-* 之上 */
-            width: var(--menu-right-width);
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            /* C3: 使用 --mica-dark-right，fallback 与原 rgba(0,0,0,0.2) 一致 */
-            background: rgba(var(--mica-dark-right, 0, 0, 0), 0.2);
-            border-left: 1px solid rgba(255, 255, 255, 0.15);
-            transition: background 0.5s ease, border-color 0.5s ease;
-            flex-shrink: 0;
-         }
-   
-         /* C4: light-mode fallback 与原 rgba(0,0,0,0.05) 一致 */
-         body.light-mode .menu-right {
-            background: rgba(var(--mica-dark-right, 0, 0, 0), 0.05);
-            border-left-color: rgba(0, 0, 0, 0.1);
-         }
-   
-         body.is-desktop .menu-right,
-         body.is-desktop.light-mode .menu-right {
-            border-left-color: transparent;
-         }
-   
-         /* Reveal 边框默认隐藏，移动端不显示 */
-         .menu-right::before {
-            opacity: 0;
-         }
+      /* ==================== 菜单左侧：章节列表 ==================== */
+      .menu-left {
+         position: relative;
+         z-index: 11;
+         /* 覆盖在 .menu-layer-* (z-index 7-10) 之上 */
+         flex: 1;
+         /* 自动填充 menu-right 之外的剩余空间，无需随 --menu-right-width 手动同步 */
+         min-width: 0;
+         /* 防止 flex 子元素溢出父容器 */
+         padding: 20px;
+         overflow-y: auto;
+         scrollbar-width: none;
+         background: transparent;
+      }
 
-         body.is-desktop .menu-right::before {
-            opacity: var(--ro, 1);
-            border-radius: 0 12px 12px 0;
-            background: radial-gradient(
-               130px circle at var(--rx, -9999px) var(--ry, -9999px),
-               rgba(var(--reveal-hi),  0.7),
+      .menu-left::-webkit-scrollbar {
+         display: none;
+      }
+
+
+      /* Canvas 叠加层 */
+      #menuRevealCanvas {
+         position: fixed;
+         pointer-events: none;
+         z-index: 1001;
+         opacity: 0;
+         transition: opacity 0.2s;
+      }
+
+      #menuRevealCanvas.active {
+         opacity: 1;
+      }
+
+      /* ==================== 章节项 ==================== */
+      .chapter-item {
+         display: flex;
+         align-items: center;
+         padding: 10px 0;
+         cursor: pointer;
+         color: rgba(var(--reveal-mid, 180, 30, 30), 0.7);
+         transition: color 0.2s, padding-left 0.2s;
+         position: relative;
+      }
+
+      .chapter-item::after {
+         content: '';
+         position: absolute;
+         bottom: 0;
+         left: 7px;
+         right: 7px;
+         height: 1px;
+         transform: scaleY(0.5);
+         transform-origin: bottom;
+         background: rgba(255, 255, 255, 0.05);
+         transition: opacity 0.3s;
+      }
+
+      body.light-mode .chapter-item::after {
+         background: rgba(0, 0, 0, 0.3);
+      }
+
+      body.is-desktop .chapter-item::after {
+         opacity: 0;
+      }
+
+      .chapter-item:last-child::after {
+         display: none;
+      }
+
+      .chapter-item.h1-item {
+         padding-left: 0;
+      }
+
+      .chapter-item.h2-item {
+         padding-left: 14px;
+         color: rgba(var(--reveal-mid, 180, 30, 30), 0.65);
+         font-size: 0.9em;
+      }
+
+      .chapter-item.h3-item {
+         padding-left: 28px;
+         color: rgba(var(--reveal-mid, 180, 30, 30), 0.45);
+         font-size: 0.85em;
+      }
+
+      body.light-mode .chapter-item {
+         color: rgba(var(--reveal-mid, 60, 60, 160), 0.7);
+      }
+
+      body.light-mode .chapter-item.h2-item {
+         color: rgba(var(--reveal-mid, 60, 60, 160), 0.45);
+      }
+
+      body.light-mode .chapter-item.h3-item {
+         color: rgba(var(--reveal-mid, 60, 60, 160), 0.3);
+      }
+
+      body.is-desktop .chapter-item:hover {
+         color: rgba(var(--reveal-hi), 1);
+      }
+
+      body.is-desktop .chapter-item.h1-item:hover {
+         padding-left: 5px;
+      }
+
+      body.is-desktop .chapter-item.h2-item:hover {
+         padding-left: 19px;
+      }
+
+      body.is-desktop .chapter-item.h3-item:hover {
+         padding-left: 33px;
+      }
+
+      .chapter-item.current {
+         color: rgba(var(--reveal-hi), 1) !important;
+      }
+
+      .chapter-item.hovered {
+         color: rgba(var(--reveal-hi), 1) !important;
+      }
+
+      /* ==================== 菜单右侧：按钮区 ==================== */
+      .menu-right {
+         position: relative;
+         z-index: 11;
+         /* 同上，覆盖在 .menu-layer-* 之上 */
+         width: var(--menu-right-width);
+         height: 100%;
+         display: flex;
+         flex-direction: column;
+         /* C3: 使用 --mica-dark-right，fallback 与原 rgba(0,0,0,0.2) 一致 */
+         background: rgba(var(--mica-dark-right, 0, 0, 0), 0.2);
+         border-left: 1px solid rgba(255, 255, 255, 0.15);
+         transition: background 0.5s ease, border-color 0.5s ease;
+         flex-shrink: 0;
+      }
+
+      /* C4: light-mode fallback 与原 rgba(0,0,0,0.05) 一致 */
+      body.light-mode .menu-right {
+         background: rgba(var(--mica-dark-right, 0, 0, 0), 0.05);
+         border-left-color: rgba(0, 0, 0, 0.1);
+      }
+
+      body.is-desktop .menu-right,
+      body.is-desktop.light-mode .menu-right {
+         border-left-color: transparent;
+      }
+
+      /* Reveal 边框默认隐藏，移动端不显示 */
+      .menu-right::before {
+         opacity: 0;
+      }
+
+      body.is-desktop .menu-right::before {
+         opacity: var(--ro, 1);
+         border-radius: 0 12px 12px 0;
+         background: radial-gradient(130px circle at var(--rx, -9999px) var(--ry, -9999px),
+               rgba(var(--reveal-hi), 0.7),
                rgba(var(--reveal-mid), 0.3) 45%,
-               transparent 70%
-            );
-         }
-   
+               transparent 70%);
+      }
 
-         .menu-buttons {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px 0;
-            width: 100%;
-         }
-   
-         .menu-btn {
-            color: rgba(var(--reveal-mid, 180, 30, 30), 0.75);
-            background: none;
-            border: none;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-size: 20px;
-            width: var(--menu-right-width);
-            border-radius: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-         }
-   
-         body.light-mode .menu-btn { color: rgba(0, 0, 0, 0.6); }
-         body.is-desktop .menu-btn:hover { color: rgba(var(--reveal-hi), 1); background-color: rgba(var(--reveal-hi), 0.1); }
-   
-         .close-btn {
-            position: relative;
-            height: 50px;
-            margin-top: auto;
-            background: rgba(0, 0, 0, 0.15);
-            color: rgba(var(--reveal-mid, 180, 30, 30), 0.6);
-            border: none;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-            cursor: pointer;
-            font-size: 16px;
-            transition: background 0.2s, color 0.2s, border-color 0.2s;
-            width: 100%;
-         }
-   
-         body.light-mode .close-btn {
-            background: rgba(0, 0, 0, 0.04);
-            color: rgba(0, 0, 0, 0.5);
-            border-top-color: rgba(0, 0, 0, 0.08);
-         }
-   
-         body.is-desktop .close-btn {
-            border-top: none;
-            background: transparent;
-         }
-   
-         body.is-desktop .close-btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 1px;
-            opacity: var(--ro, 1);
-            background: radial-gradient(
-               130px circle at var(--rx, -9999px) var(--ry, -9999px),
-               rgba(var(--reveal-hi),  0.95),
+
+      .menu-buttons {
+         flex: 1;
+         display: flex;
+         flex-direction: column;
+         justify-content: space-between;
+         align-items: center;
+         padding: 20px 0;
+         width: 100%;
+      }
+
+      .menu-btn {
+         color: rgba(var(--reveal-mid, 180, 30, 30), 0.75);
+         background: none;
+         border: none;
+         cursor: pointer;
+         transition: all 0.2s;
+         font-size: 20px;
+         width: var(--menu-right-width);
+         border-radius: 0;
+         display: flex;
+         justify-content: center;
+         align-items: center;
+      }
+
+      body.light-mode .menu-btn {
+         color: rgba(0, 0, 0, 0.6);
+      }
+
+      body.is-desktop .menu-btn:hover {
+         color: rgba(var(--reveal-hi), 1);
+         background-color: rgba(var(--reveal-hi), 0.1);
+      }
+
+      .close-btn {
+         position: relative;
+         height: 50px;
+         margin-top: auto;
+         background: rgba(0, 0, 0, 0.15);
+         color: rgba(var(--reveal-mid, 180, 30, 30), 0.6);
+         border: none;
+         border-top: 1px solid rgba(255, 255, 255, 0.1);
+         cursor: pointer;
+         font-size: 16px;
+         transition: background 0.2s, color 0.2s, border-color 0.2s;
+         width: 100%;
+      }
+
+      body.light-mode .close-btn {
+         background: rgba(0, 0, 0, 0.04);
+         color: rgba(0, 0, 0, 0.5);
+         border-top-color: rgba(0, 0, 0, 0.08);
+      }
+
+      body.is-desktop .close-btn {
+         border-top: none;
+         background: transparent;
+      }
+
+      body.is-desktop .close-btn::before {
+         content: '';
+         position: absolute;
+         top: 0;
+         left: 0;
+         right: 0;
+         height: 1px;
+         opacity: var(--ro, 1);
+         background: radial-gradient(130px circle at var(--rx, -9999px) var(--ry, -9999px),
+               rgba(var(--reveal-hi), 0.95),
                rgba(var(--reveal-mid), 0.4) 45%,
-               transparent 70%
-            );
-            pointer-events: none;
-            z-index: 3;
-         }
-   
-         body.is-desktop .close-btn:hover { color: rgba(var(--reveal-hi), 1); background-color: rgba(var(--reveal-hi), 0.08); }
-   
-         /* ==================== Reveal：floating-btn ==================== */
-         /* --toggle-hi / --toggle-mid 由 JS updateProgress 随滚动进度实时写入 body，
+               transparent 70%);
+         pointer-events: none;
+         z-index: 3;
+      }
+
+      body.is-desktop .close-btn:hover {
+         color: rgba(var(--reveal-hi), 1);
+         background-color: rgba(var(--reveal-hi), 0.08);
+      }
+
+      /* ==================== Reveal：floating-btn ==================== */
+      /* --toggle-hi / --toggle-mid 由 JS updateProgress 随滚动进度实时写入 body，
             默认值对应初始状态（暗色主题、进度为 0）。                              */
-         .floating-btn::before {
-            border-radius: 50%;
-            opacity: var(--ro, 1);
-            background: radial-gradient(
-               80px circle at var(--rx, -9999px) var(--ry, -9999px),
-               rgba(var(--toggle-hi,  255, 0,   0),   0.95),
-               rgba(var(--toggle-mid, 180, 30,  30),  0.45) 45%,
-               transparent 70%
-            );
-         }
+      .floating-btn::before {
+         border-radius: 50%;
+         opacity: var(--ro, 1);
+         background: radial-gradient(80px circle at var(--rx, -9999px) var(--ry, -9999px),
+               rgba(var(--toggle-hi, 255, 0, 0), 0.95),
+               rgba(var(--toggle-mid, 180, 30, 30), 0.45) 45%,
+               transparent 70%);
+      }
 
-         /* ==================== floating-btn 悬停发光（M2 移除 boxShadow='none' 后生效）==================== */
-         body.is-desktop .floating-btn:hover {
-            /* --toggle-glow 由 JS updateProgress 预构建完整 rgba() 字符串写入，避免 rgba(var(), alpha) 解析歧义 */
-            box-shadow: 0 0 20px 6px var(--toggle-glow, rgba(255, 0, 0, 0.45)),
-                        0 6px 24px rgba(0, 0, 0, 0.45);
-            transition: box-shadow 0.25s ease;
-         }
-   
-         .header, .floating-btn, .side-menu, .comments {
-            user-select: none;
-            -webkit-user-select: none;
-            -webkit-touch-callout: none;
-         }
+      /* ==================== floating-btn 悬停发光（M2 移除 boxShadow='none' 后生效）==================== */
+      body.is-desktop .floating-btn:hover {
+         /* --toggle-glow 由 JS updateProgress 预构建完整 rgba() 字符串写入，避免 rgba(var(), alpha) 解析歧义 */
+         box-shadow: 0 0 20px 6px var(--toggle-glow, rgba(255, 0, 0, 0.45)),
+            0 6px 24px rgba(0, 0, 0, 0.45);
+         transition: box-shadow 0.25s ease;
+      }
 
-         /* ==================== 减少动效（系统无障碍设置）==================== */
-         @media (prefers-reduced-motion: reduce) {
-            *, *::before, *::after {
-               transition-duration: 0.01ms !important;
-               animation-duration: 0.01ms !important;
-            }
-         }
-         
-      </style>
+      .header,
+      .floating-btn,
+      .side-menu,
+      .comments {
+         user-select: none;
+         -webkit-user-select: none;
+         -webkit-touch-callout: none;
+      }
+   </style>
 
-   </head>
+</head>
 
-   <body class="{% if blog.theme.mode == 'light' %}light-mode{% else %}dark-mode{% endif %}">
-      <div class="header">
-         <h1 class="title">{{ article.title | default('') }}</h1>
-         <p class="summary">{{ article.summary | default('') }}</p>
-         <div class="date">{{ article.date | default('') }}</div>
-         <div class="tags">
-            {% for tag in article.tags %}
-            <span class="tag">{{ tag }}</span>
-            {% endfor %}
-         </div>
+<body class="{% if blog.theme.mode == 'light' %}light-mode{% else %}dark-mode{% endif %}">
+   <div class="header">
+      <h1 class="title">{{ article.title | default('') }}</h1>
+      <p class="summary">{{ article.summary }}</p>
+      <div class="date">{{ article.date }}</div>
+      <div class="tags">
+         {% for tag in article.tags %}
+         <span class="tag">{{ tag }}</span>
+         {% endfor %}
       </div>
-   
-      <div class="content">
-         {{ article.content | safe | default('') }}
-      </div>
-   
-      <div class="comments"></div>
-   
-      <button class="floating-btn" id="menuToggle">☰</button>
-   
-      <div class="menu-mask" id="menuMask"></div>
-   
-      <div class="side-menu-wrapper" id="sideMenuWrapper">
-         <div class="side-menu" id="sideMenu">
-            <div class="menu-left" id="chapterList"></div>
-            <div class="menu-right" id="menuRightEl">
-               <div class="menu-buttons">
-                  <button class="menu-btn" id="toBottomBtn">▼</button>
-                  <button class="menu-btn" id="middleBtn">◎</button>
-                  <button class="menu-btn" id="toTopBtn">▲</button>
-               </div>
-               <button class="close-btn" id="closeBtn">╳</button>
+   </div>
+
+   <div class="content">
+      {{ article.content | safe | default('') }}
+   </div>
+
+   <div class="comments"></div>
+
+   <button class="floating-btn" id="menuToggle">☰</button>
+
+   <div class="menu-mask" id="menuMask"></div>
+
+   <div class="side-menu-wrapper" id="sideMenuWrapper">
+      <div class="side-menu" id="sideMenu">
+         <div class="menu-left" id="chapterList"></div>
+         <div class="menu-right" id="menuRightEl">
+            <div class="menu-buttons">
+               <button class="menu-btn" id="toBottomBtn">▼</button>
+               <button class="menu-btn" id="middleBtn">◎</button>
+               <button class="menu-btn" id="toTopBtn">▲</button>
             </div>
+            <button class="close-btn" id="closeBtn">╳</button>
          </div>
       </div>
-   
-      <canvas id="menuRevealCanvas"></canvas>
-   
-      <script>
-        // ==================== 1. 工具函数 ====================
+   </div>
 
-        /** 根据系统"减少动效"设置决定滚动行为，避免前庭功能障碍用户不适 */
-        const _reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        function scrollBehavior() { return _reducedMotion ? 'instant' : 'smooth'; }
+   <canvas id="menuRevealCanvas"></canvas>
+
+   <script>
+      // ==================== 1. 工具函数 ====================
 
         /**
          * 通用防抖函数
@@ -803,7 +938,7 @@
                   // 纯时间判定：位置连续稳定 ≥ 50ms 即视为滚动结束
                   if (now - stableAt >= 50) { resolve(); return; }
                 }
-                else if (now - t0 > 100) { resolve(); return; }
+                else if (now - t0 > 300) { resolve(); return; }
               }
               if (now - t0 > timeout) { resolve(); return; }
               requestAnimationFrame(check);
@@ -1074,7 +1209,7 @@
               return Promise.resolve();
             }
             return smoothScrollPromise(
-              () => chapterListEl.scrollTo({ top: target, behavior: scrollBehavior() }),
+              () => chapterListEl.scrollTo({ top: target, behavior }),
               () => chapterListEl.scrollTop
             ).finally(() => { state.programmaticScrollCount--; });
           }
@@ -1112,7 +1247,7 @@
             if (distToTop < 4) { onFinally(false); return; }
             state.menuDrivingArticleCount++;
             smoothScrollPromise(
-              () => heading.scrollIntoView({ behavior: scrollBehavior(), block: 'start' }),
+              () => heading.scrollIntoView({ behavior: 'smooth', block: 'start' }),
               () => window.scrollY
             ).finally(() => {
               state.menuDrivingArticleCount--;
@@ -1274,9 +1409,7 @@
               listItem.addEventListener('click', (e) => {
                 e.stopPropagation();
                 state.currentId = heading.id;   // 立即同步，避免菜单关闭后高亮回退到旧章节
-                // 使用与 updateActiveHeading 相同的 80px offset，避免高亮与实际位置错位
-                const targetY = _headingTops[allHeadings.indexOf(heading)] - 80;
-                window.scrollTo({ top: Math.max(0, targetY), behavior: scrollBehavior() });
+                heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 onItemClick?.();
               });
 
@@ -1316,7 +1449,7 @@
               state.isMenuScrolling = true;
               state.activeState     = 'menu';
               const realtimeId = getCenteredItemId();
-              if (realtimeId && realtimeId !== state.currentId) setHighlight(realtimeId);
+              if (realtimeId) setHighlight(realtimeId);
               menuScrollDebounce.call();
             }, { passive: true });
 
@@ -1351,11 +1484,12 @@
             }
           }
 
-          /** 菜单打开时调用：将当前高亮项即时居中。返回 Promise 供入场动画等待（M11 预留）。 */
-          function syncToMenu() {
-            if (state.currentId) return scrollMenuToItem(state.currentId, 'instant');
-            return Promise.resolve();
-          }
+         /** 菜单打开时调用：将当前高亮项即时居中。返回 Promise 供入场动画等待（M11 预留）。 */
+         function syncToMenu() {
+         rebuildHeadingTopCache(); // 菜单可见后重建，此时 offsetTop 才有效
+         if (state.currentId) return scrollMenuToItem(state.currentId, 'instant');
+         return Promise.resolve();
+         }
 
           /** 菜单关闭时调用：取消悬停状态，回退到 scroll。
            *  注：menuScrollDebounce 不在此处取消——onMenuScrollDebounced 的 finally
@@ -1597,23 +1731,19 @@
                 if (!_prevMenuActive) clearRevealVar(el);
                 return;
               }
-              // 统一从缓存读取 rect；缓存缺失（含动画期间 null）时降级到实时查询
-              const rect = cachedTargetRects?.get(el) ?? el.getBoundingClientRect();
+              // 统一从缓存读取 rect；缓存缺失时降级到实时查询（防御性回退）
+              const rect = cachedTargetRects.get(el) ?? el.getBoundingClientRect();
               updateRevealVar(el, e.clientX, e.clientY, range, distFn, rect);
             });
             _prevMenuActive = menuActive;
 
             // 光照光层（.menu-layer-light）全屏坐标写入：
-            // 体积光半径 75px，超过 fadeZone（75*0.5=37.5）时光斑已完全不可见，跳过写入。
-            // 菜单不在视口中央时 cachedSideMenuRect 可能为 null，降级为始终写入。
+            // 不经过 range 裁切，鼠标在屏幕任意位置时均持续更新，
+            // 避免超出菜单边界时光源坐标跳到 -9999px 产生断片。
+            // 坐标系为相对于 .side-menu（光照光层的 position:absolute 定位父容器）。
             if (menuActive && cachedSideMenuRect) {
-              const sDistX = Math.max(cachedSideMenuRect.left - e.clientX, 0, e.clientX - cachedSideMenuRect.right);
-              const sDistY = Math.max(cachedSideMenuRect.top  - e.clientY, 0, e.clientY - cachedSideMenuRect.bottom);
-              const sDist  = Math.sqrt(sDistX * sDistX + sDistY * sDistY);
-              if (sDist <= 75 * 1.5) {
-                sideMenuEl.style.setProperty('--lx', (e.clientX - cachedSideMenuRect.left) + 'px');
-                sideMenuEl.style.setProperty('--ly', (e.clientY - cachedSideMenuRect.top)  + 'px');
-              }
+              sideMenuEl.style.setProperty('--lx', (e.clientX - cachedSideMenuRect.left) + 'px');
+              sideMenuEl.style.setProperty('--ly', (e.clientY - cachedSideMenuRect.top)  + 'px');
             }
 
             // Canvas 绘制：rAF 节流，每帧最多执行一次，合并高频 pointermove
@@ -1745,12 +1875,7 @@
             ).join('\n      ');
             const edgeRect     = `<rect width="${w}" height="${h}" fill="url(#${gradId})"/>`;
 
-            return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" style="display:block">
-  ${defs}
-  ${noiseRect}
-  <g>${scratchPaths}</g>
-  ${edgeRect}
-</svg>`;
+            return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" style="display:block">${defs}${noiseRect}<g>${scratchPaths}</g>${edgeRect}</svg>`;
           }
 
           // ── 公开接口 ──────────────────────────────────────────────
@@ -1796,7 +1921,7 @@
 
           // ── 工具函数 ──────────────────────────────────────────
           function parseRgba(str) {
-            const m = str.match(/rgba?\(\s*(\d+)\s*[, ]\s*(\d+)\s*[, ]\s*(\d+)/);
+            const m = str.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
             return m ? [+m[1], +m[2], +m[3]] : null;
           }
           function isTransparent(str) {
@@ -1807,17 +1932,14 @@
           // hasChroma / rgbToHsl / hslToRgb / clamp 已提升至顶层工具函数区（1b），此处直接引用。
 
           // ── 路A：从视口内 <img> 元素采像素 ──────────────────
-          // 文章内容服务端渲染，图片列表在页面加载后不再变化，缓存一次即可
-          let _cachedImgs = null;
           function sampleFromImages() {
-            if (!_cachedImgs) _cachedImgs = Array.from(document.querySelectorAll('img'));
             const vw = window.innerWidth, vh = window.innerHeight;
             // M3: 只取视口中间 20% 矩形区域（以中心为基准，±10%）内的图片
             const cx = vw / 2, cy = vh / 2;
             const zoneW = vw * 0.1, zoneH = vh * 0.1;   // 半宽/半高
             // Q2: filter + map 合并为单次遍历，每张图只调用一次 getBoundingClientRect
             const candidates = [];
-            for (const img of _cachedImgs) {
+            for (const img of document.querySelectorAll('img')) {
               if (!img.complete || img.naturalWidth === 0) continue;
               const r = img.getBoundingClientRect();
               if (r.width <= 20 || r.height <= 20) continue;
@@ -2042,19 +2164,25 @@
           _menuOpening = true;
           try {
             state.isWheelScrolling = false;        // 防御：关/开菜单之间若 debounce 尚未触发，复位屏蔽标志
-            // M5 Fix3: 必须在菜单显示之前采样，否则菜单覆盖视口，只能采到菜单自身的灰色
-            await micaSampler.sampleIfNeeded();
+            // 先激活菜单 DOM，确保交互状态机立即就绪（touch/scroll 事件不被 Mica 采样延迟阻塞）
+            // Mica 采样在菜单显示后异步执行：视口已被菜单覆盖，采样结果仅作颜色刷新用，不影响交互
             sideMenuWrapper.classList.add('active');
             sideMenu.classList.add('active');
             menuMask.classList.add('active');
             menuToggle.style.display = 'none';
-            // 质感层：菜单 display:flex 后再取尺寸，确保 offsetWidth/Height 有效
+            // 质感层：按需重建（滚动后 _dirty=true 时才重新生成 SVG）
             texturePainter.paintIfNeeded();
             highlighter.syncToMenu();
             if (isDesktop && reveal) {
-              reveal.resizeCanvas();               // 读取颜色缓存（在 Mica 之后）
+              reveal.resizeCanvas();
               reveal.attachScrollListener();
             }
+            // Mica 采样异步执行，不阻塞菜单交互；采样完成后用新颜色刷新 Reveal
+            micaSampler.sampleIfNeeded().then(() => {
+              if (isDesktop && reveal && sideMenuWrapper.classList.contains('active')) {
+                reveal.resizeCanvas();   // 用 Mica 新颜色更新颜色缓存
+              }
+            });
           } finally {
             _menuOpening = false;
           }
@@ -2106,25 +2234,25 @@
         // --- 按钮事件 ---
         menuToggle.addEventListener('click',  (e) => { e.stopPropagation(); openMenu(); });
         closeBtn.addEventListener('click',    (e) => { e.stopPropagation(); closeMenu(); });
-        menuMask.addEventListener('click',    () => closeMenu());
+        menuMask.addEventListener('click',    (e) => { e.stopPropagation(); closeMenu(); });
         sideMenu.addEventListener('click',    (e) => e.stopPropagation());
 
         toBottomBtn.addEventListener('click', (e) => {
           e.stopPropagation();
-          window.scrollTo({ top: document.documentElement.scrollHeight, behavior: scrollBehavior() });
+          window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
           closeMenu();
         });
 
         middleBtn.addEventListener('click', (e) => {
           e.stopPropagation();
           const middle = (document.documentElement.scrollHeight - window.innerHeight) / 2;
-          window.scrollTo({ top: middle, behavior: scrollBehavior() });
+          window.scrollTo({ top: middle, behavior: 'smooth' });
           closeMenu();
         });
 
         toTopBtn.addEventListener('click', (e) => {
           e.stopPropagation();
-          window.scrollTo({ top: 0, behavior: scrollBehavior() });
+          window.scrollTo({ top: 0, behavior: 'smooth' });
           closeMenu();
         });
 
@@ -2142,8 +2270,8 @@
           if (bgPacked !== _lastBgValue) {
             _lastBgValue = bgPacked;
             menuToggle.style.backgroundColor = `rgb(${bgR}, ${bgG}, ${bgB})`;
-            // 日间模式背景为浅色系时用黑字，夜间模式用白字保证可读性
-            menuToggle.style.color = _isLightMode ? '#000' : '#fff';
+            // 背景始终为深色系，字色固定白色保证可读性（日间/夜间均适用）
+            menuToggle.style.color = '#fff';
           }
         }
 
@@ -2204,8 +2332,8 @@
         // 用 requestAnimationFrame 确保 DOM 完成首次渲染后再采样
         requestAnimationFrame(() => micaSampler.sampleIfNeeded());
 
-      </script>
+   </script>
 
-   </body>
+</body>
 
 </html>
