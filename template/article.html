@@ -548,41 +548,29 @@
             --reveal-hi 独立，两者色相相同但亮度/饱和度偏移规则不同）。
             fallback 值对应夜间模式降级状态（深红体积光）。
 
-            三层叠加策略（A 方案）：
-              · 核心层（12px）：高亮热点，主导视觉亮度
-              · 中层（38px）：散射光晕，不透明度约核心的 1/3，承上启下
-              · 外层（75px）：极淡边缘晕，让光斑自然化开而非硬截断
-            三层共享圆心，不透明度呈指数递减，视觉上感知为单一光斑而非套圈。
-            filter: blur(2px) 进一步柔化最外层边缘的像素锯齿。
-
+            两层叠加 + blur（A 方案）：
+              无明显热核，中心到边缘过渡平缓，整体呈漫射柔光而非聚光斑。
+              filter: blur(6px) 抹平渐变边缘的最后一点锯齿，让光自然晕开。
             mix-blend-mode: screen（C 方案）：
-              光斑与下层玻璃底色做屏幕混合，产生"光透过玻璃"效果，
-              而非"光贴在玻璃表面"的平面叠加感。
-              日间模式切换为 soft-light，避免 screen 在浅色背景下过曝。 */
+              光与下层玻璃底色屏幕混合，产生"光从材质内部散出"的感觉。
+              日间切换为 soft-light，避免浅色背景下过曝。 */
       .menu-layer-light {
          z-index: 8;
          mix-blend-mode: screen;
-         filter: blur(2px);
+         filter: blur(6px);
          background:
-            /* 核心热点：小半径，高不透明度，主导光斑视觉重心 */
-            radial-gradient(12px circle at var(--lx, -9999px) var(--ly, -9999px),
-               rgba(var(--volume-light, 180, 0, 0), 0.13) 0%,
-               rgba(var(--volume-light, 180, 0, 0), 0.06) 60%,
+            radial-gradient(90px circle at var(--lx, -9999px) var(--ly, -9999px),
+               rgba(var(--volume-light, 180, 0, 0), 0.048) 0%,
+               rgba(var(--volume-light, 180, 0, 0), 0.022) 40%,
+               rgba(var(--volume-light, 180, 0, 0), 0.006) 75%,
                transparent 100%),
-            /* 中层散射：中半径，不透明度约核心 1/3，承接核心向外过渡 */
-            radial-gradient(38px circle at var(--lx, -9999px) var(--ly, -9999px),
-               rgba(var(--volume-light, 180, 0, 0), 0.045) 0%,
-               rgba(var(--volume-light, 180, 0, 0), 0.018) 55%,
-               transparent 100%),
-            /* 外层晕：大半径，极低不透明度，柔化光斑边缘截断感 */
-            radial-gradient(75px circle at var(--lx, -9999px) var(--ly, -9999px),
-               rgba(var(--volume-light, 180, 0, 0), 0.016) 0%,
-               rgba(var(--volume-light, 180, 0, 0), 0.005) 50%,
+            radial-gradient(140px circle at var(--lx, -9999px) var(--ly, -9999px),
+               rgba(var(--volume-light, 180, 0, 0), 0.014) 0%,
+               rgba(var(--volume-light, 180, 0, 0), 0.004) 55%,
                transparent 100%);
       }
 
       body.light-mode .menu-layer-light {
-         /* 日间：screen 在浅色背景下会过曝，改用 soft-light 保持层次感 */
          mix-blend-mode: soft-light;
       }
 
