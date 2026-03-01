@@ -428,6 +428,10 @@
 
       .menu-mask.active {
          display: block;
+         /* 遮罩只提供视觉背景，不拦截鼠标事件——否则 document 的 pointermove 收不到，
+            Reveal / 体积光 / hover 高亮全部失效。
+            关闭菜单的点击逻辑改由 document 级别的 click 监听承担。 */
+         pointer-events: none;
       }
 
       /* ==================== 亚克力侧边菜单 wrapper ==================== */
@@ -506,9 +510,10 @@
          display: flex;
       }
 
-      /* ==================== 菜单四层材质结构（z-index 7-10，由 JS buildMenuLayers 注入 DOM）==================== */
+      /* ==================== 菜单五层材质结构（z-index 7-10，由 JS buildMenuLayers 注入 DOM）==================== */
       .menu-layer-base,
       .menu-layer-light,
+      .menu-layer-acrylic,
       .menu-layer-texture {
          position: absolute;
          inset: 0;
@@ -556,7 +561,17 @@
                transparent 100%);
       }
 
-/* 第2层（z-index:10）：斑驳质感层
+      /* 第3层（z-index:9）：过渡层，纯色半透明，不使用 backdrop-filter */
+      .menu-layer-acrylic {
+         z-index: 9;
+         background: rgba(255, 255, 255, 0.05);
+      }
+
+      body.light-mode .menu-layer-acrylic {
+         background: rgba(0, 0, 0, 0.03);
+      }
+
+      /* 第2层（z-index:10）：斑驳质感层
             · SVG（feTurbulence + feDisplacementMap + feComposite）由 JS 动态注入
             · mix-blend-mode: overlay  在夜间模式下呈现金属做旧感
             · opacity 由 JS 写入 --texture-opacity，主题切换时跟随更新        */
@@ -1759,7 +1774,6 @@
           }
 
           document.addEventListener('pointermove',  handleMove);
-          document.addEventListener('pointerup',    handleMove);
           document.addEventListener('pointerleave', clearAllReveal);
           window.addEventListener('blur',           clearAllReveal);
 
@@ -2119,14 +2133,14 @@
         });
 
         /**
-         * buildMenuLayers：向 .side-menu 注入三层材质结构 DOM（base / light / texture）。
+         * buildMenuLayers：向 .side-menu 注入五层结构 DOM。
          * 幂等设计：检测 .menu-layer-base 是否已存在，防止重复插入。
          * 在初始化阶段执行一次，菜单关闭/打开不会重新创建。
          */
         function buildMenuLayers() {
           if (sideMenu.querySelector('.menu-layer-base')) return;
           const fragment = document.createDocumentFragment();
-          ['base', 'light', 'texture'].forEach(name => {
+          ['base', 'light', 'acrylic', 'texture'].forEach(name => {
             const layer = document.createElement('div');
             layer.className = `menu-layer-${name}`;
             fragment.appendChild(layer);
@@ -2228,8 +2242,17 @@
         // --- 按钮事件 ---
         menuToggle.addEventListener('click',  (e) => { e.stopPropagation(); openMenu(); });
         closeBtn.addEventListener('click',    (e) => { e.stopPropagation(); closeMenu(); });
-        menuMask.addEventListener('click',    (e) => { e.stopPropagation(); closeMenu(); });
         sideMenu.addEventListener('click',    (e) => e.stopPropagation());
+
+        // 遮罩已设 pointer-events:none（避免吃掉 pointermove 导致 Reveal/体积光/hover 失效），
+        // 改由 document 级 click 监听：点击落点不在菜单内时关闭菜单，行为与原遮罩点击一致。
+        document.addEventListener('click', (e) => {
+          if (sideMenuWrapper.classList.contains('active') &&
+              !sideMenuWrapper.contains(e.target) &&
+              !menuToggle.contains(e.target)) {
+            closeMenu();
+          }
+        });
 
         toBottomBtn.addEventListener('click', (e) => {
           e.stopPropagation();
