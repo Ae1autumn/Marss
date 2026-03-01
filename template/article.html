@@ -428,9 +428,6 @@
 
       .menu-mask.active {
          display: block;
-         /* 遮罩只提供视觉背景，不拦截鼠标事件——否则 document 的 pointermove 收不到，
-            Reveal / 体积光 / hover 高亮全部失效。
-            关闭菜单的点击逻辑改由 document 级别的 click 监听承担。 */
          pointer-events: none;
       }
 
@@ -1213,11 +1210,14 @@
             if (Math.abs(target - chapterListEl.scrollTop) < 1) return Promise.resolve();
 
             state.programmaticScrollCount++;
-            // instant 滚动同帧完成，smoothScrollPromise 轮询会误判为"未启动"并等待 300ms。
-            // 在此处单独处理：同步执行 scrollTo 后直接 resolve，保持 count 语义正确。
+            // instant 滚动同帧完成，但浏览器的 scroll 事件派发是异步的（微任务后）。
+            // 若在同帧内立即 count--，scroll 事件到达时 count 已为 0，守卫失效，
+            // 导致 activeState 被错误切换为 'menu' 并启动 menuScrollDebounce 锁链。
+            // 用 Promise.resolve().then() 把 count-- 推迟到当前微任务队列末尾，
+            // 确保 scroll 事件到达时 count 仍 > 0，守卫有效。
             if (behavior === 'instant') {
               chapterListEl.scrollTo({ top: target, behavior: 'instant' });
-              state.programmaticScrollCount--;
+              Promise.resolve().then(() => { state.programmaticScrollCount--; });
               return Promise.resolve();
             }
             return smoothScrollPromise(
@@ -2244,8 +2244,7 @@
         closeBtn.addEventListener('click',    (e) => { e.stopPropagation(); closeMenu(); });
         sideMenu.addEventListener('click',    (e) => e.stopPropagation());
 
-        // 遮罩已设 pointer-events:none（避免吃掉 pointermove 导致 Reveal/体积光/hover 失效），
-        // 改由 document 级 click 监听：点击落点不在菜单内时关闭菜单，行为与原遮罩点击一致。
+        // 遮罩已设 pointer-events:none，改由 document 级 click 监听关闭菜单
         document.addEventListener('click', (e) => {
           if (sideMenuWrapper.classList.contains('active') &&
               !sideMenuWrapper.contains(e.target) &&
