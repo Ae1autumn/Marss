@@ -428,7 +428,6 @@
 
       .menu-mask.active {
          display: block;
-         pointer-events: none;
       }
 
       /* ==================== 亚克力侧边菜单 wrapper ==================== */
@@ -1210,14 +1209,11 @@
             if (Math.abs(target - chapterListEl.scrollTop) < 1) return Promise.resolve();
 
             state.programmaticScrollCount++;
-            // instant 滚动同帧完成，但浏览器的 scroll 事件派发是异步的（微任务后）。
-            // 若在同帧内立即 count--，scroll 事件到达时 count 已为 0，守卫失效，
-            // 导致 activeState 被错误切换为 'menu' 并启动 menuScrollDebounce 锁链。
-            // 用 Promise.resolve().then() 把 count-- 推迟到当前微任务队列末尾，
-            // 确保 scroll 事件到达时 count 仍 > 0，守卫有效。
+            // instant 滚动同帧完成，smoothScrollPromise 轮询会误判为"未启动"并等待 300ms。
+            // 在此处单独处理：同步执行 scrollTo 后直接 resolve，保持 count 语义正确。
             if (behavior === 'instant') {
               chapterListEl.scrollTo({ top: target, behavior: 'instant' });
-              Promise.resolve().then(() => { state.programmaticScrollCount--; });
+              state.programmaticScrollCount--;
               return Promise.resolve();
             }
             return smoothScrollPromise(
@@ -1774,6 +1770,7 @@
           }
 
           document.addEventListener('pointermove',  handleMove);
+          document.addEventListener('pointerup',    handleMove);
           document.addEventListener('pointerleave', clearAllReveal);
           window.addEventListener('blur',           clearAllReveal);
 
@@ -2172,15 +2169,8 @@
           // active class 同时充当防重入检查：菜单已打开时直接跳出
           if (sideMenuWrapper.classList.contains('active')) return;
           state.isWheelScrolling = false;        // 防御：关/开菜单之间若 debounce 尚未触发，复位屏蔽标志
-          // Mica 采样必须在 menuMask 激活之前执行：
-          // menuMask 是全屏 fixed 覆盖层（pointer-events: auto），激活后 elementFromPoint
-          // 的所有采样点均命中 menuMask（background: rgba(0,0,0,0.3)），导致采到纯黑色。
-          // sample() 内部无 await，DOM 查询全程同步，此处调用不阻塞后续菜单显示。
-          micaSampler.sampleIfNeeded().then(() => {
-            if (isDesktop && reveal && sideMenuWrapper.classList.contains('active')) {
-              reveal.resizeCanvas();   // 用 Mica 新颜色更新颜色缓存
-            }
-          });
+          // 先激活菜单 DOM，确保交互状态机立即就绪（touch/scroll 事件不被 Mica 采样延迟阻塞）
+          // Mica 采样在菜单显示后异步执行：视口已被菜单覆盖，采样结果仅作颜色刷新用，不影响交互
           sideMenuWrapper.classList.add('active');
           sideMenu.classList.add('active');
           menuMask.classList.add('active');
@@ -2194,6 +2184,12 @@
             reveal.resizeCanvas();
             reveal.attachScrollListener();
           }
+          // Mica 采样异步执行，不阻塞菜单交互；采样完成后用新颜色刷新 Reveal
+          micaSampler.sampleIfNeeded().then(() => {
+            if (isDesktop && reveal && sideMenuWrapper.classList.contains('active')) {
+              reveal.resizeCanvas();   // 用 Mica 新颜色更新颜色缓存
+            }
+          });
         }
 
         function closeMenu() {
@@ -2242,16 +2238,8 @@
         // --- 按钮事件 ---
         menuToggle.addEventListener('click',  (e) => { e.stopPropagation(); openMenu(); });
         closeBtn.addEventListener('click',    (e) => { e.stopPropagation(); closeMenu(); });
+        menuMask.addEventListener('click',    (e) => { e.stopPropagation(); closeMenu(); });
         sideMenu.addEventListener('click',    (e) => e.stopPropagation());
-
-        // 遮罩已设 pointer-events:none，改由 document 级 click 监听关闭菜单
-        document.addEventListener('click', (e) => {
-          if (sideMenuWrapper.classList.contains('active') &&
-              !sideMenuWrapper.contains(e.target) &&
-              !menuToggle.contains(e.target)) {
-            closeMenu();
-          }
-        });
 
         toBottomBtn.addEventListener('click', (e) => {
           e.stopPropagation();
