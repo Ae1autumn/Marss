@@ -31,7 +31,12 @@
    <style>
       /* ==================== 基础重置 ==================== */
       *, *::before, *::after { box-sizing: border-box; }
-      * { margin: 0; padding: 0; }
+      * {
+         margin: 0;
+         padding: 0;
+         -webkit-tap-highlight-color: transparent;
+         -webkit-touch-callout: none;
+      }
 
       /* ==================== 主题 CSS 变量 ==================== */
       body.dark-mode {
@@ -81,41 +86,43 @@
       }
 
       body.light-mode {
-         --bg-base:          #e8e8e8;
-         --bg-noise-opacity: 0.025;
-         --bg-mica-opacity:  0.22;
+         --bg-base:          #f0f0f2;
+         --bg-noise-opacity: 0.018;
+         --bg-mica-opacity:  0.16;
 
-         --card-l1-bg:       rgba(255,255,255,0.72);
-         --card-l1-border:   rgba(0,0,0,0.08);
-         --card-l2-bg:       rgba(255,255,255,0.58);
-         --card-l2-border:   rgba(0,0,0,0.06);
-         --card-l3-bg:       rgba(255,255,255,0.45);
-         --card-l3-border:   rgba(0,0,0,0.05);
+         /* 卡片：更接近纯白，不透明度更高，日间不需要透出背景 */
+         --card-l1-bg:       rgba(255,255,255,0.88);
+         --card-l1-border:   rgba(0,0,0,0.07);
+         --card-l2-bg:       rgba(255,255,255,0.75);
+         --card-l2-border:   rgba(0,0,0,0.055);
+         --card-l3-bg:       rgba(0,0,0,0.025);
+         --card-l3-border:   rgba(0,0,0,0.06);
 
-         --text-primary:     rgba(0,0,0,0.90);
-         --text-secondary:   rgba(0,0,0,0.55);
-         --text-tertiary:    rgba(0,0,0,0.35);
-         --text-accent:      rgba(var(--reveal-hi, 60,80,200), 0.9);
+         --text-primary:     rgba(0,0,0,0.88);
+         --text-secondary:   rgba(0,0,0,0.52);
+         --text-tertiary:    rgba(0,0,0,0.32);
+         --text-accent:      rgba(var(--reveal-hi, 50,70,190), 0.9);
 
-         --divider:          rgba(0,0,0,0.07);
-         --divider-strong:   rgba(0,0,0,0.12);
+         --divider:          rgba(0,0,0,0.06);
+         --divider-strong:   rgba(0,0,0,0.10);
 
-         --code-bg:          rgba(0,0,0,0.04);
-         --code-inline-bg:   rgba(0,0,0,0.055);
-         --code-border:      rgba(0,0,0,0.08);
+         --code-bg:          rgba(0,0,0,0.035);
+         --code-inline-bg:   rgba(0,0,0,0.05);
+         --code-border:      rgba(0,0,0,0.07);
 
-         --tag-bg:           rgba(0,0,0,0.05);
-         --tag-border:       rgba(0,0,0,0.10);
-         --tag-text:         rgba(0,0,0,0.65);
+         --tag-bg:           rgba(var(--reveal-hi, 50,70,190), 0.06);
+         --tag-border:       rgba(var(--reveal-hi, 50,70,190), 0.15);
+         --tag-text:         rgba(var(--reveal-hi, 50,70,190), 0.85);
 
-         --quote-accent:     rgba(var(--reveal-hi, 60,80,200), 0.55);
-         --quote-bg:         rgba(var(--reveal-hi, 60,80,200), 0.04);
+         --quote-accent:     rgba(var(--reveal-hi, 50,70,190), 0.6);
+         --quote-bg:         rgba(var(--reveal-hi, 50,70,190), 0.04);
 
-         --reveal-hi:        60, 80, 200;
-         --reveal-mid:       50, 65, 170;
+         --reveal-hi:        50, 70, 190;
+         --reveal-mid:       40, 55, 160;
 
-         --shadow-card:      0 4px 24px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.08);
-         --shadow-inner:     inset 0 1px 0 rgba(255,255,255,0.7);
+         /* 日间阴影更轻更扩散，避免厚重感 */
+         --shadow-card:      0 2px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05);
+         --shadow-inner:     inset 0 1px 0 rgba(255,255,255,0.9);
       }
 
       /* ==================== 沉浸式全宽背景 ==================== */
@@ -162,15 +169,29 @@
          opacity: var(--bg-mica-opacity);
          background: radial-gradient(
             ellipse 80% 60% at 30% 20%,
-            rgba(var(--reveal-hi, 200,160,255), 0.5) 0%,
+            rgba(var(--reveal-hi, 200,160,255), 0.45) 0%,
             transparent 70%
          ),
          radial-gradient(
             ellipse 60% 50% at 75% 75%,
-            rgba(var(--reveal-mid, 150,100,220), 0.35) 0%,
+            rgba(var(--reveal-mid, 150,100,220), 0.3) 0%,
             transparent 65%
          );
          transition: opacity 0.5s ease;
+      }
+
+      /* 日间模式：背景白亮，Mica 雾收敛到边角，中心保持干净 */
+      body.light-mode::after {
+         background: radial-gradient(
+            ellipse 50% 40% at 10% 10%,
+            rgba(var(--reveal-hi, 50,70,190), 0.18) 0%,
+            transparent 65%
+         ),
+         radial-gradient(
+            ellipse 40% 35% at 90% 85%,
+            rgba(var(--reveal-mid, 40,55,160), 0.12) 0%,
+            transparent 60%
+         );
       }
 
       /* ==================== 页面主容器 ==================== */
@@ -673,6 +694,10 @@
          stroke-width: 1.5;
       }
 
+      body.light-mode .progress-track {
+         stroke: rgba(var(--reveal-mid), 0.18);
+      }
+
       .progress-fill {
          stroke: rgba(var(--toggle-hi, 200,160,255), 0.7);
          stroke-width: 1.5;
@@ -803,10 +828,10 @@
 
       body.light-mode .menu-layer-base {
          background: linear-gradient(to right,
-               rgba(var(--mica-dark-left, 255, 255, 255), 0.65) 0%,
-               rgba(var(--mica-dark-left, 255, 255, 255), 0.65) calc(100% - var(--menu-right-width)),
-               rgba(var(--mica-dark-right, 232, 232, 232), 0.65) calc(100% - var(--menu-right-width)),
-               rgba(var(--mica-dark-right, 232, 232, 232), 0.65) 100%);
+               rgba(var(--mica-dark-left, 255, 255, 255), 0.82) 0%,
+               rgba(var(--mica-dark-left, 255, 255, 255), 0.82) calc(100% - var(--menu-right-width)),
+               rgba(var(--mica-dark-right, 240, 240, 245), 0.82) calc(100% - var(--menu-right-width)),
+               rgba(var(--mica-dark-right, 240, 240, 245), 0.82) 100%);
       }
 
       /* 第4层（z-index:8）：内部体积光，跟随鼠标，纯渐变无 backdrop-filter。
@@ -830,7 +855,7 @@
       }
 
       body.light-mode .menu-layer-acrylic {
-         background: rgba(0, 0, 0, 0.03);
+         background: rgba(255, 255, 255, 0.12);
       }
 
       /* 第2层（z-index:10）：斑驳质感层
@@ -869,10 +894,14 @@
          font-size: 0.65rem;
          font-weight: 700;
          letter-spacing: 0.12em;
-         color: rgba(var(--reveal-mid), 0.4);
+         color: rgba(var(--reveal-mid), 0.45);
          padding: 0 10px 10px;
          border-bottom: 1px solid var(--divider);
          margin-bottom: 8px;
+      }
+
+      body.light-mode .menu-left::before {
+         color: rgba(var(--reveal-mid), 0.55);
       }
 
       .menu-left::-webkit-scrollbar { display: none; }
@@ -980,7 +1009,8 @@
       }
 
       body.light-mode .menu-right {
-         background: rgba(var(--mica-dark-right, 0, 0, 0), 0.04);
+         background: rgba(var(--mica-dark-right, 0, 0, 0), 0.03);
+         border-left-color: var(--divider);
       }
 
       body.is-desktop .menu-right,
@@ -1046,7 +1076,7 @@
          height: 36px;
          margin: 0 auto 12px;
          background: rgba(var(--reveal-hi), 0.06);
-         color: rgba(var(--reveal-mid), 0.5);
+         color: rgba(var(--reveal-mid), 0.6);
          border: 1px solid var(--divider-strong);
          border-radius: 8px;
          cursor: pointer;
