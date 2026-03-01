@@ -945,6 +945,7 @@
           menuDrivingArticleCount: 0,        // 菜单驱动的文章滚动计数
           lastMouseX:              -9999,    // 最新鼠标位置（Reveal 写，Highlighter 读）
           lastMouseY:              -9999,
+          animatingOut:            false,    // 出场动画播放锁：true 期间屏蔽 scroll/pointer 对状态机的写入
         };
 
 
@@ -1096,7 +1097,7 @@
               () => window.scrollY
             ).finally(() => {
               state.menuDrivingArticleCount--;
-              onFinally(true);
+              if (!state.animatingOut) onFinally(true);   // 出场锁期间放弃回调，防止竞态写入状态机
             });
           }
 
@@ -1276,6 +1277,7 @@
             // 滚轮：设置屏蔽标志，防止假 pointer 事件干扰
             // 从 hover 切出时立即 setHighlight，清除残留的 .hovered 类，避免双高亮
             chapterListEl.addEventListener('wheel', () => {
+              if (state.animatingOut) return;   // 出场动画播放锁
               if (!state.isWheelScrolling) {
                 state.isWheelScrolling = true;
                 if (state.activeState === 'hover') {
@@ -1289,6 +1291,7 @@
 
             // 菜单列表滚动：实时更新高亮并触发防抖吸附
             chapterListEl.addEventListener('scroll', () => {
+              if (state.animatingOut) return;    // 出场动画播放锁
               if (state.programmaticScrollCount > 0) return;
               if (state.activeState === 'hover') return;
               state.isMenuScrolling = true;
@@ -1307,6 +1310,7 @@
               // pointerover：仅在进入新 item 且没有程序驱动滚动时触发
               chapterListEl.addEventListener('pointerover', (e) => {
                 if (e.pointerType !== 'mouse') return;
+                if (state.animatingOut) return;    // 出场动画播放锁
                 if (state.isWheelScrolling || state.isHoverScrolling) return;
                 const item = e.target.closest('.chapter-item');
                 if (item && item !== state.hoveredItem) onItemPointerEnter(item);
@@ -1315,6 +1319,7 @@
               // pointerout：relatedTarget 不在当前 item 内部、且没有程序驱动滚动时触发
               chapterListEl.addEventListener('pointerout', (e) => {
                 if (e.pointerType !== 'mouse') return;
+                if (state.animatingOut) return;    // 出场动画播放锁
                 if (state.isWheelScrolling || state.isHoverScrolling) return;
                 const item = e.target.closest('.chapter-item');
                 if (item && !item.contains(e.relatedTarget)) onItemPointerLeave();
@@ -1323,10 +1328,24 @@
               // pointerleave（整个列表）：isWheelScrolling/isHoverScrolling 期间屏蔽
               chapterListEl.addEventListener('pointerleave', (e) => {
                 if (e.pointerType !== 'mouse') return;
+                if (state.animatingOut) return;    // 出场动画播放锁
                 if (state.isWheelScrolling || state.isHoverScrolling) return;
                 if (state.activeState === 'hover') onItemPointerLeave();
               });
             }
+          }
+
+          /**
+           * 返回当前 chapterList 视口内可见的 chapter-item 列表（按 DOM 顺序）。
+           * 用于出场/入场动画的视口过滤，复用 _itemOffsetCache 避免 reflow。
+           */
+          function getAllItemsForViewport() {
+            const containerH = chapterListEl.clientHeight;
+            const scrollTop  = chapterListEl.scrollTop;
+            return allItems.filter((item, i) => {
+              const { offsetTop, height } = _itemOffsetCache[i] || { offsetTop: item.offsetTop, height: item.offsetHeight };
+              return offsetTop + height > scrollTop && offsetTop < scrollTop + containerH;
+            });
           }
 
           /** 菜单打开时调用：将当前高亮项即时居中。返回 Promise 供入场动画等待（M11 预留）。 */
@@ -1352,7 +1371,7 @@
             }
           }
 
-          return { init, syncToMenu, cancelHover, updateActiveHeading, rebuildHeadingTopCache, getAllItems: () => allItems };
+          return { init, syncToMenu, cancelHover, updateActiveHeading, rebuildHeadingTopCache, getAllItems: () => allItems, getAllItemsForViewport };
         }
 
 
@@ -1965,6 +1984,76 @@
         });
 
         /**
+         * animationController
+         * 统一管理所有 chapter-item 的 Web Animations API 实例。
+         * 职责：
+         *   play(items, buildKeyframes, duration, baseDelay, delayStep)
+         *     - 对每个 item 调用 element.animate()，存储 Animation 实例
+         *     - buildKeyframes(item) 返回该 item 的 keyframe 数组
+         *     - 返回 Promise，在最后一个动画结束后 resolve
+         *   cancel()
+         *     - 立即取消所有正在播放的动画（出场被打断时使用）
+         *   getSnapshot()
+         *     - 读取每个 item 当前的 opacity / translateX 中间值
+         *     - 返回 Map<element, { opacity, translateX }>
+         *     - 供打断机制（入场打断出场）反向构造 keyframes 使用（第2步预留）
+         */
+        const animationController = (() => {
+          // element → Animation 实例
+          const _map = new Map();
+
+          function play(items, buildKeyframes, duration, baseDelay, delayStep) {
+            // 取消已有动画（防止快速重复触发时叠加）
+            cancel();
+            const promises = items.map((item, i) => {
+              const anim = item.animate(buildKeyframes(item), {
+                duration,
+                delay:    baseDelay + i * delayStep,
+                easing:   'ease-in',
+                fill:     'forwards',   // 动画结束后保持末帧状态，直到 cancel() 清除
+              });
+              _map.set(item, anim);
+              return anim.finished;
+            });
+            // 全部完成后清除 forwards 填充，将样式控制权还给 CSS
+            return Promise.all(promises).then(() => {
+              _map.forEach(anim => anim.cancel());
+              _map.clear();
+            });
+          }
+
+          function cancel() {
+            _map.forEach(anim => anim.cancel());
+            _map.clear();
+          }
+
+          /**
+           * 读取每个 item 当前动画中间值（供打断机制使用，第2步预留）。
+           * 通过 getComputedStyle 读取合成后的实际值，与 fill:forwards 兼容。
+           */
+          function getSnapshot() {
+            const snap = new Map();
+            _map.forEach((anim, el) => {
+              const cs         = getComputedStyle(el);
+              const transform  = cs.transform;
+              let translateX   = 0;
+              if (transform && transform !== 'none') {
+                // matrix(a,b,c,d,tx,ty) → tx 为第5个值
+                const parts = transform.match(/matrix\(([^)]+)\)/);
+                if (parts) translateX = parseFloat(parts[1].split(',')[4]) || 0;
+              }
+              snap.set(el, {
+                opacity:    parseFloat(cs.opacity) || 0,
+                translateX,
+              });
+            });
+            return snap;
+          }
+
+          return { play, cancel, getSnapshot };
+        })();
+
+        /**
          * buildMenuLayers（M6）：向 .side-menu 注入五层结构 DOM。
          * 幂等设计：检测 .menu-layer-base 是否已存在，防止重复插入。
          * 在初始化阶段执行一次，菜单关闭/打开不会重新创建。
@@ -1999,14 +2088,20 @@
         window.addEventListener('scroll', _onWindowScroll, { passive: true });
 
         // --- 菜单控制（UI 层操作 + 调用各模块接口）---
-        // 防重入标志：openMenu 含 await，若在 await 期间再次触发（如快速双击），
-        // 第二次调用直接退出，避免 DOM 状态错乱。
+        // 防重入标志：openMenu / closeMenu 均含 await，快速重复触发时直接退出，避免 DOM 状态错乱。
         let _menuOpening = false;
+        let _menuClosing = false;
 
         async function openMenu() {
           if (_menuOpening) return;
           _menuOpening = true;
           try {
+            // 若出场动画正在播放（用户快速关→开），立即中断并释放锁
+            if (state.animatingOut) {
+              animationController.cancel();
+              state.animatingOut = false;
+              _menuClosing = false;   // 同步重置，使 closeMenu 可再次进入
+            }
             state.isWheelScrolling = false;        // 防御：关/开菜单之间若 debounce 尚未触发，复位屏蔽标志
             // M5 Fix3: 必须在菜单显示之前采样，否则菜单覆盖视口，只能采到菜单自身的灰色
             await micaSampler.sampleIfNeeded();
@@ -2026,8 +2121,44 @@
           }
         }
 
-        function closeMenu() {
+        async function closeMenu() {
           if (!sideMenuWrapper.classList.contains('active')) return;
+          if (_menuClosing) return;
+          _menuClosing = true;
+
+          // ── 出场动画 ──────────────────────────────────────────
+          // 1. 获取当前视口内可见的 chapter-item（视口外直接 display:none，无动画）
+          const visibleItems = highlighter.getAllItemsForViewport();
+
+          if (visibleItems.length > 0) {
+            // 2. 置出场锁：屏蔽 scroll/wheel/pointer 对状态机的干扰
+            state.animatingOut = true;
+
+            // 3. 播放出场动画：translateX(0 → 20px) + opacity(1 → 0)
+            //    延迟从左到右递增（视觉上从右往左消失：右侧先出，左侧后出）
+            //    items 按 DOM 顺序排列（从上到下 = 从左到右缩进），
+            //    反转后最右侧（最深缩进）的 item delay 最小，最左侧 delay 最大。
+            const reversed     = visibleItems.slice().reverse();
+            const DURATION     = 300;   // ms，与入场动画时长保持一致
+            const BASE_DELAY   = 0;
+            const DELAY_STEP   = 20;    // ms，每项递增
+
+            await animationController.play(
+              reversed,
+              () => [
+                { transform: 'translateX(0px)',  opacity: 1 },
+                { transform: 'translateX(20px)', opacity: 0 },
+              ],
+              DURATION,
+              BASE_DELAY,
+              DELAY_STEP
+            );
+
+            // 4. 出场完成，释放锁
+            state.animatingOut = false;
+          }
+
+          // ── 真正隐藏菜单（动画结束后） ──────────────────────
           sideMenuWrapper.classList.remove('active');
           sideMenu.classList.remove('active');
           menuMask.classList.remove('active');
@@ -2036,7 +2167,10 @@
             reveal.detachScrollListener();  // 仅移除 canvas scroll 监听，保留 menuToggle Reveal
             reveal.clearAllReveal();
           }
+          // cancelHover 后移到动画结束后，彻底消除与 driveArticleScroll finally 的竞态
           highlighter.cancelHover();
+
+          _menuClosing = false;
         }
 
         // --- 初始化高亮器（传入 closeMenu 作为 item 点击回调）---
