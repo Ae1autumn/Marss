@@ -2169,8 +2169,15 @@
           // active class 同时充当防重入检查：菜单已打开时直接跳出
           if (sideMenuWrapper.classList.contains('active')) return;
           state.isWheelScrolling = false;        // 防御：关/开菜单之间若 debounce 尚未触发，复位屏蔽标志
-          // 先激活菜单 DOM，确保交互状态机立即就绪（touch/scroll 事件不被 Mica 采样延迟阻塞）
-          // Mica 采样在菜单显示后异步执行：视口已被菜单覆盖，采样结果仅作颜色刷新用，不影响交互
+          // Mica 采样必须在 menuMask 激活之前执行：
+          // menuMask 是全屏 fixed 覆盖层（pointer-events: auto），激活后 elementFromPoint
+          // 的所有采样点均命中 menuMask（background: rgba(0,0,0,0.3)），导致采到纯黑色。
+          // sample() 内部无 await，DOM 查询全程同步，此处调用不阻塞后续菜单显示。
+          micaSampler.sampleIfNeeded().then(() => {
+            if (isDesktop && reveal && sideMenuWrapper.classList.contains('active')) {
+              reveal.resizeCanvas();   // 用 Mica 新颜色更新颜色缓存
+            }
+          });
           sideMenuWrapper.classList.add('active');
           sideMenu.classList.add('active');
           menuMask.classList.add('active');
@@ -2184,12 +2191,6 @@
             reveal.resizeCanvas();
             reveal.attachScrollListener();
           }
-          // Mica 采样异步执行，不阻塞菜单交互；采样完成后用新颜色刷新 Reveal
-          micaSampler.sampleIfNeeded().then(() => {
-            if (isDesktop && reveal && sideMenuWrapper.classList.contains('active')) {
-              reveal.resizeCanvas();   // 用 Mica 新颜色更新颜色缓存
-            }
-          });
         }
 
         function closeMenu() {
