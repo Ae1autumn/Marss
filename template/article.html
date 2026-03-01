@@ -1592,6 +1592,10 @@
             canvasEl.height      = r.height;
             canvasEl.style.left  = r.left + 'px';
             canvasEl.style.top   = r.top  + 'px';
+            // 预存取整尺寸（canvas width/height 为整数），供 drawDividerGlow 校验时直接比较，
+            // 避免每帧 rAF 回调中重复执行 Math.round()。
+            r._intW = canvasEl.width;
+            r._intH = canvasEl.height;
             cachedMenuRect     = r;
             cachedSideMenuRect = null;   // 动画期间坐标无效，animationend 后再赋值
             updateColorCache();
@@ -1662,8 +1666,8 @@
             //     避免高频 rAF 回调在 fixed 元素上重复触发 getBoundingClientRect reflow。
             let menuRect = cachedMenuRect;
             if (!menuRect ||
-                canvasEl.width  !== Math.round(menuRect.width)  ||
-                canvasEl.height !== Math.round(menuRect.height) ||
+                canvasEl.width  !== menuRect._intW ||
+                canvasEl.height !== menuRect._intH ||
                 parseFloat(canvasEl.style.left) !== menuRect.left ||
                 parseFloat(canvasEl.style.top)  !== menuRect.top) {
               menuRect            = chapterListEl.getBoundingClientRect();
@@ -1671,6 +1675,8 @@
               canvasEl.height     = menuRect.height;
               canvasEl.style.left = menuRect.left + 'px';
               canvasEl.style.top  = menuRect.top  + 'px';
+              menuRect._intW      = canvasEl.width;
+              menuRect._intH      = canvasEl.height;
               cachedMenuRect      = menuRect;
               cachedItemRects     = null;   // canvas 尺寸变了，旧缓存坐标已失效
             }
@@ -1716,7 +1722,7 @@
             ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
             canvasEl.classList.remove('active');
             rafPending = false;
-            _prevMenuActive = false;   // ⚠️ 必须重置：确保下次菜单打开时 alwaysOn 元素（menuToggle）的 Reveal 清除逻辑能正常触发
+            _prevMenuActive = false;   // ⚠️ 必须重置：确保下次菜单打开后第一次 handleMove 时，alwaysOn 元素（menuToggle）的 Reveal 能被正确清除（状态切换帧仅清除一次）
             // 菜单关闭后 menuToggle 重新可见，旧缓存（含 display:none 时的零尺寸 rect）已失效，
             // 置 null 使下次 pointermove 重建缓存，确保 alwaysOn 元素 Reveal 坐标正确。
             cachedTargetRects = null;
@@ -2140,7 +2146,7 @@
          * 在初始化阶段执行一次，菜单关闭/打开不会重新创建。
          */
         function buildMenuLayers() {
-          if (sideMenu.querySelector('.menu-layer-base')) return;
+          if (sideMenu.children[0]?.classList.contains('menu-layer-base')) return;
           const fragment = document.createDocumentFragment();
           ['base', 'light', 'acrylic', 'texture'].forEach(name => {
             const layer = document.createElement('div');
@@ -2200,6 +2206,9 @@
 
         function closeMenu() {
           if (!sideMenuWrapper.classList.contains('active')) return;
+          // TODO(出场动画)：实现出场动画时，需先播放动画再移除 active class；
+          //                  届时将 closeMenu 改为 async，引入动画播放锁屏蔽状态机干扰，
+          //                  并处理 cancelHover() 与 driveArticleScroll finally 的竞态。
           sideMenuWrapper.classList.remove('active');
           sideMenu.classList.remove('active');
           menuMask.classList.remove('active');
