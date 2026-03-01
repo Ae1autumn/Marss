@@ -206,10 +206,11 @@
       .card-l1::before {
          border-radius: inherit;
          background: radial-gradient(
-            380px circle at var(--rx, -9999px) var(--ry, -9999px),
-            rgba(var(--reveal-hi), 0.5),
-            rgba(var(--reveal-mid), 0.18) 45%,
-            transparent 68%
+            750px circle at var(--rx, -9999px) var(--ry, -9999px),
+            rgba(var(--reveal-hi), 0.85),
+            rgba(var(--reveal-mid), 0.35) 40%,
+            rgba(var(--reveal-mid), 0.1) 60%,
+            transparent 75%
          );
          opacity: 0;
       }
@@ -252,7 +253,6 @@
          padding: 32px 36px 28px;
          margin-bottom: 16px;
          position: relative;
-         overflow: hidden;
       }
 
       /* header 内部 Mica 高光角 */
@@ -603,32 +603,83 @@
          transition: border-color 0.5s ease;
       }
 
-      /* ==================== 亚克力浮动按钮 ==================== */
+      /* ==================== 浮动触发按钮 ==================== */
       .floating-btn {
          position: fixed;
-         bottom: 30px;
-         right: 30px;
-         width: 60px;
-         height: 60px;
+         bottom: 32px;
+         right: 32px;
+         width: 52px;
+         height: 52px;
          border-radius: 50%;
          display: flex;
          justify-content: center;
          align-items: center;
          cursor: pointer;
-         font-size: 22px;
          z-index: 1000;
          border: 1px solid var(--card-l1-border);
          outline: none;
          color: var(--text-primary);
          background: var(--card-l1-bg);
-         backdrop-filter: blur(24px) saturate(1.5);
-         -webkit-backdrop-filter: blur(24px) saturate(1.5);
+         backdrop-filter: blur(24px) saturate(1.6);
+         -webkit-backdrop-filter: blur(24px) saturate(1.6);
          box-shadow: var(--shadow-card);
-         transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+         transition: background 0.3s ease, transform 0.2s ease;
+         padding: 0;
       }
 
-      body.is-desktop .floating-btn {
-         border: none;
+      body.is-desktop .floating-btn { border: none; }
+
+      body.is-desktop .floating-btn:hover {
+         transform: scale(1.08);
+         box-shadow: 0 0 24px 6px var(--toggle-glow, rgba(200,160,255,0.35)),
+                     var(--shadow-card);
+      }
+
+      /* 汉堡线 */
+      .floating-btn-icon {
+         display: flex;
+         flex-direction: column;
+         gap: 4.5px;
+         pointer-events: none;
+      }
+
+      .floating-btn-icon span {
+         display: block;
+         height: 1.5px;
+         border-radius: 2px;
+         background: currentColor;
+         transition: width 0.25s ease, opacity 0.2s ease, transform 0.25s ease;
+      }
+
+      .floating-btn-icon span:nth-child(1) { width: 18px; }
+      .floating-btn-icon span:nth-child(2) { width: 14px; }
+      .floating-btn-icon span:nth-child(3) { width: 10px; }
+
+      body.is-desktop .floating-btn:hover .floating-btn-icon span { width: 18px; }
+
+      /* SVG 进度环 */
+      .floating-btn-progress {
+         position: absolute;
+         inset: -3px;
+         width: calc(100% + 6px);
+         height: calc(100% + 6px);
+         pointer-events: none;
+         transform: rotate(-90deg);
+         opacity: 0.7;
+      }
+
+      .progress-track {
+         stroke: rgba(var(--reveal-mid), 0.12);
+         stroke-width: 1.5;
+      }
+
+      .progress-fill {
+         stroke: rgba(var(--toggle-hi, 200,160,255), 0.7);
+         stroke-width: 1.5;
+         stroke-linecap: round;
+         stroke-dasharray: 119.4;  /* 2π × 19 */
+         stroke-dashoffset: 119.4;
+         transition: stroke-dashoffset 0.1s linear, stroke 0.5s ease;
       }
 
       /* ==================== 遮罩 ==================== */
@@ -764,11 +815,11 @@
             fallback 值对应夜间模式降级状态（深红体积光）。 */
       .menu-layer-light {
          z-index: 8;
-         background: radial-gradient(75px circle at var(--lx, -9999px) var(--ly, -9999px),
-               rgba(var(--volume-light, 180, 0, 0), 0.055) 0%,
-               rgba(var(--volume-light, 180, 0, 0), 0.03) 30%,
-               rgba(var(--volume-light, 180, 0, 0), 0.008) 60%,
-               rgba(var(--volume-light, 180, 0, 0), 0) 85%,
+         background: radial-gradient(110px circle at var(--lx, -9999px) var(--ly, -9999px),
+               rgba(var(--volume-light, 160, 120, 255), 0.07) 0%,
+               rgba(var(--volume-light, 160, 120, 255), 0.04) 30%,
+               rgba(var(--volume-light, 160, 120, 255), 0.01) 60%,
+               rgba(var(--volume-light, 160, 120, 255), 0) 85%,
                transparent 100%);
       }
 
@@ -803,20 +854,28 @@
       .menu-left {
          position: relative;
          z-index: 11;
-         /* 覆盖在 .menu-layer-* (z-index 7-10) 之上 */
          flex: 1;
-         /* 自动填充 menu-right 之外的剩余空间，无需随 --menu-right-width 手动同步 */
          min-width: 0;
-         /* 防止 flex 子元素溢出父容器 */
-         padding: 20px;
+         padding: 14px 10px;
          overflow-y: auto;
          scrollbar-width: none;
          background: transparent;
       }
 
-      .menu-left::-webkit-scrollbar {
-         display: none;
+      /* 章节列表顶部标签 */
+      .menu-left::before {
+         content: 'CONTENTS';
+         display: block;
+         font-size: 0.65rem;
+         font-weight: 700;
+         letter-spacing: 0.12em;
+         color: rgba(var(--reveal-mid), 0.4);
+         padding: 0 10px 10px;
+         border-bottom: 1px solid var(--divider);
+         margin-bottom: 8px;
       }
+
+      .menu-left::-webkit-scrollbar { display: none; }
 
 
       /* Canvas 叠加层 */
@@ -836,72 +895,75 @@
       .chapter-item {
          display: flex;
          align-items: center;
-         padding: 10px 0;
+         padding: 7px 10px;
+         margin: 1px 0;
          cursor: pointer;
-         color: rgba(var(--reveal-mid), 0.7);
-         transition: color 0.2s, padding-left 0.2s;
+         color: rgba(var(--reveal-mid), 0.65);
+         transition: color 0.2s, background 0.2s, padding-left 0.2s;
          position: relative;
-         font-size: 0.9rem;
+         font-size: 0.82rem;
+         font-weight: 400;
+         letter-spacing: 0.01em;
+         border-radius: 6px;
+         line-height: 1.35;
       }
 
+      /* 活跃指示器：左侧竖线，仅 current/hovered 时显示 */
+      .chapter-item::before {
+         content: '';
+         position: absolute;
+         left: 0;
+         top: 50%;
+         transform: translateY(-50%) scaleY(0);
+         width: 2px;
+         height: 60%;
+         border-radius: 2px;
+         background: rgba(var(--reveal-hi), 0.9);
+         transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s;
+         opacity: 0;
+      }
+
+      .chapter-item.h1-item { padding-left: 10px; font-weight: 500; }
+      .chapter-item.h2-item { padding-left: 20px; color: rgba(var(--reveal-mid), 0.5); font-size: 0.78rem; }
+      .chapter-item.h3-item { padding-left: 30px; color: rgba(var(--reveal-mid), 0.35); font-size: 0.74rem; }
+
+      body.is-desktop .chapter-item:hover {
+         color: rgba(var(--reveal-hi), 0.9);
+         background: rgba(var(--reveal-hi), 0.06);
+      }
+
+      body.is-desktop .chapter-item.h1-item:hover { padding-left: 14px; }
+      body.is-desktop .chapter-item.h2-item:hover { padding-left: 24px; }
+      body.is-desktop .chapter-item.h3-item:hover { padding-left: 34px; }
+
+      .chapter-item.current,
+      .chapter-item.hovered {
+         color: rgba(var(--reveal-hi), 1) !important;
+         background: rgba(var(--reveal-hi), 0.08) !important;
+         font-weight: 500;
+      }
+
+      .chapter-item.current::before,
+      .chapter-item.hovered::before {
+         transform: translateY(-50%) scaleY(1);
+         opacity: 1;
+      }
+
+      /* 移动端分隔线 */
       .chapter-item::after {
          content: '';
          position: absolute;
          bottom: 0;
-         left: 7px;
-         right: 7px;
+         left: 10px;
+         right: 10px;
          height: 1px;
          transform: scaleY(0.5);
          transform-origin: bottom;
          background: var(--divider);
-         transition: opacity 0.3s;
       }
 
-      body.is-desktop .chapter-item::after {
-         opacity: 0;
-      }
-
-      .chapter-item:last-child::after {
-         display: none;
-      }
-
-      .chapter-item.h1-item { padding-left: 0; }
-
-      .chapter-item.h2-item {
-         padding-left: 14px;
-         color: rgba(var(--reveal-mid), 0.55);
-         font-size: 0.85em;
-      }
-
-      .chapter-item.h3-item {
-         padding-left: 28px;
-         color: rgba(var(--reveal-mid), 0.38);
-         font-size: 0.8em;
-      }
-
-      body.is-desktop .chapter-item:hover {
-         color: rgba(var(--reveal-hi), 1);
-      }
-
-      body.is-desktop .chapter-item.h1-item:hover {
-         padding-left: 5px;
-      }
-
-      body.is-desktop .chapter-item.h2-item:hover {
-         padding-left: 19px;
-      }
-
-      body.is-desktop .chapter-item.h3-item:hover {
-         padding-left: 33px;
-      }
-
-      .chapter-item.current {
-         color: rgba(var(--reveal-hi), 1) !important;
-      }
-
-      .chapter-item.hovered {
-         color: rgba(var(--reveal-hi), 1) !important;
-      }
+      body.is-desktop .chapter-item::after { display: none; }
+      .chapter-item:last-child::after { display: none; }
 
       /* ==================== 菜单右侧：按钮区 ==================== */
       .menu-right {
@@ -945,94 +1007,82 @@
          flex: 1;
          display: flex;
          flex-direction: column;
-         justify-content: space-between;
+         justify-content: center;
          align-items: center;
-         padding: 20px 0;
+         gap: 4px;
+         padding: 16px 0;
          width: 100%;
       }
 
       .menu-btn {
-         color: rgba(var(--reveal-mid), 0.7);
+         color: rgba(var(--reveal-mid), 0.6);
          background: none;
          border: none;
          cursor: pointer;
-         transition: all 0.2s;
-         font-size: 18px;
-         width: var(--menu-right-width);
-         border-radius: 0;
+         transition: color 0.2s, background 0.2s, transform 0.15s;
+         font-size: 14px;
+         width: 36px;
+         height: 36px;
+         border-radius: 8px;
+         display: flex;
+         justify-content: center;
+         align-items: center;
+         position: relative;
+      }
+
+      body.is-desktop .menu-btn:hover {
+         color: rgba(var(--reveal-hi), 1);
+         background: rgba(var(--reveal-hi), 0.1);
+         transform: scale(1.1);
+      }
+
+      body.is-desktop .menu-btn:active {
+         transform: scale(0.95);
+      }
+
+      .close-btn {
+         position: relative;
+         width: 36px;
+         height: 36px;
+         margin: 0 auto 12px;
+         background: rgba(var(--reveal-hi), 0.06);
+         color: rgba(var(--reveal-mid), 0.5);
+         border: 1px solid var(--divider-strong);
+         border-radius: 8px;
+         cursor: pointer;
+         font-size: 11px;
+         transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.15s;
          display: flex;
          justify-content: center;
          align-items: center;
       }
 
-      body.is-desktop .menu-btn:hover {
-         color: rgba(var(--reveal-hi), 1);
-         background-color: rgba(var(--reveal-hi), 0.1);
-      }
-
-      .close-btn {
-         position: relative;
-         height: 50px;
-         margin-top: auto;
-         background: rgba(var(--mica-dark-right, 0, 0, 0), 0.12);
-         color: rgba(var(--reveal-mid), 0.55);
-         border: none;
-         border-top: 1px solid var(--divider);
-         cursor: pointer;
-         font-size: 14px;
-         transition: background 0.2s, color 0.2s, border-color 0.2s;
-         width: 100%;
-      }
-
       body.is-desktop .close-btn {
-         border-top: none;
-         background: transparent;
-      }
-
-      body.is-desktop .close-btn::before {
-         content: '';
-         position: absolute;
-         top: 0;
-         left: 0;
-         right: 0;
-         height: 1px;
-         opacity: var(--ro, 1);
-         background: radial-gradient(130px circle at var(--rx, -9999px) var(--ry, -9999px),
-               rgba(var(--reveal-hi), 0.95),
-               rgba(var(--reveal-mid), 0.4) 45%,
-               transparent 70%);
-         pointer-events: none;
-         z-index: 3;
+         border-color: transparent;
+         background: rgba(var(--reveal-hi), 0.04);
       }
 
       body.is-desktop .close-btn:hover {
          color: rgba(var(--reveal-hi), 1);
-         background-color: rgba(var(--reveal-hi), 0.08);
+         background: rgba(var(--reveal-hi), 0.12);
+         transform: scale(1.1);
+      }
+
+      body.is-desktop .close-btn:active {
+         transform: scale(0.95);
       }
 
       /* ==================== Reveal：floating-btn ==================== */
-      /* --toggle-hi / --toggle-mid 由 JS updateProgress 随滚动进度实时写入 body，
-            默认值对应初始状态（暗色主题、进度为 0）。                              */
       .floating-btn::before {
          border-radius: 50%;
          opacity: var(--ro, 1);
          background: radial-gradient(80px circle at var(--rx, -9999px) var(--ry, -9999px),
-               rgba(var(--toggle-hi, 200, 160, 255), 0.95),
-               rgba(var(--toggle-mid, 150, 100, 220), 0.45) 45%,
+               rgba(var(--toggle-hi, 200, 160, 255), 0.9),
+               rgba(var(--toggle-mid, 150, 100, 220), 0.4) 45%,
                transparent 70%);
       }
 
-      /* ==================== floating-btn 悬停发光 ==================== */
-      body.is-desktop .floating-btn:hover {
-         box-shadow: 0 0 20px 6px var(--toggle-glow, rgba(200, 160, 255, 0.45)),
-            0 6px 24px rgba(0, 0, 0, 0.45);
-         transition: box-shadow 0.25s ease;
-      }
-
-      /* 菜单打开时通过 .hidden class 隐藏按钮，避免 JS 硬编码 display 类型 */
-      .floating-btn.hidden {
-         display: none !important;
-      }
+      .floating-btn.hidden { display: none !important; }
 
       .header,
       .floating-btn,
@@ -1068,20 +1118,49 @@
       <div class="comments card-l1"></div>
    </div>
 
-   <button class="floating-btn" id="menuToggle">☰</button>
+   <!-- 浮动触发按钮 -->
+   <button class="floating-btn" id="menuToggle" aria-label="打开目录">
+      <span class="floating-btn-icon">
+         <span></span><span></span><span></span>
+      </span>
+      <svg class="floating-btn-progress" viewBox="0 0 44 44" fill="none">
+         <circle class="progress-track" cx="22" cy="22" r="19"/>
+         <circle class="progress-fill" cx="22" cy="22" r="19" id="progressCircle"/>
+      </svg>
+   </button>
 
    <div class="menu-mask" id="menuMask"></div>
 
+   <!-- 侧边菜单 -->
    <div class="side-menu-wrapper" id="sideMenuWrapper">
       <div class="side-menu" id="sideMenu">
+         <!-- 章节列表 -->
          <div class="menu-left" id="chapterList"></div>
+         <!-- 工具栏 -->
          <div class="menu-right" id="menuRightEl">
             <div class="menu-buttons">
-               <button class="menu-btn" id="toBottomBtn">▼</button>
-               <button class="menu-btn" id="middleBtn">◎</button>
-               <button class="menu-btn" id="toTopBtn">▲</button>
+               <button class="menu-btn" id="toTopBtn" aria-label="回到顶部">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                     <path d="M8 3L3 8M8 3L13 8M8 3V13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+               </button>
+               <button class="menu-btn" id="middleBtn" aria-label="跳到中间">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                     <circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.5"/>
+                     <path d="M8 2V4M8 12V14M2 8H4M12 8H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                  </svg>
+               </button>
+               <button class="menu-btn" id="toBottomBtn" aria-label="跳到底部">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                     <path d="M8 13L3 8M8 13L13 8M8 13V3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+               </button>
             </div>
-            <button class="close-btn" id="closeBtn">╳</button>
+            <button class="close-btn" id="closeBtn" aria-label="关闭菜单">
+               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <path d="M2 2L12 12M12 2L2 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+               </svg>
+            </button>
          </div>
       </div>
    </div>
@@ -2319,7 +2398,7 @@
           function applyReveal(clientX, clientY) {
             if (!_rects) rebuildRects();
             _rects.forEach(({ el, rect }) => {
-              updateRevealVar(el, clientX, clientY, 320, distToRect, rect);
+              updateRevealVar(el, clientX, clientY, 600, distToRect, rect);
             });
           }
 
@@ -2528,20 +2607,33 @@
 
         // ==================== 11. 滚动进度指示器 ====================
 
-        /** 职责①：按钮背景色（滚动进度插值，写入 style.backgroundColor） */
+        // 进度环元素缓存
+        const _progressCircle = document.getElementById('progressCircle');
+        const _progressCircumference = 2 * Math.PI * 19; // 119.38
+
+        /** 职责①：进度环 stroke-dashoffset（滚动进度驱动） */
         function _updateBtnBg(t) {
+          // 进度环：从空到满
+          if (_progressCircle) {
+            const offset = _progressCircumference * (1 - t);
+            const offsetStr = offset.toFixed(2);
+            if (_progressCircle._lastOffset !== offsetStr) {
+              _progressCircle._lastOffset = offsetStr;
+              _progressCircle.style.strokeDashoffset = offsetStr;
+            }
+          }
+          // 背景色：仍保留 Mica 插值，但用透明度极低的方式体现（不遮挡亚克力质感）
           const [dr, dg, db] = _micaColorDark;
           const [hr, hg, hb] = _micaColorHi;
           const bgR = Math.round(dr + (hr - dr) * t);
           const bgG = Math.round(dg + (hg - dg) * t);
           const bgB = Math.round(db + (hb - db) * t);
-          // 用合并值做脏检测（避免三通道各自比较）
           const bgPacked = (bgR << 16) | (bgG << 8) | bgB;
           if (bgPacked !== _lastBgValue) {
             _lastBgValue = bgPacked;
-            menuToggle.style.backgroundColor = `rgb(${bgR}, ${bgG}, ${bgB})`;
-            // 背景始终为深色系，字色固定白色保证可读性（日间/夜间均适用）
-            menuToggle.style.color = '#fff';
+            // 不再用实心背景，改为极轻的 Mica 着色，保留亚克力透明感
+            menuToggle.style.backgroundColor = '';
+            menuToggle.style.color = '';
           }
         }
 
