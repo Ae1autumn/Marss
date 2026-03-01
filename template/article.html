@@ -546,15 +546,44 @@
       /* 第4层（z-index:8）：内部体积光，跟随鼠标，纯渐变无 backdrop-filter。
             颜色使用专用的 --volume-light（由 Mica 采样器计算，与 Reveal 边框光的
             --reveal-hi 独立，两者色相相同但亮度/饱和度偏移规则不同）。
-            fallback 值对应夜间模式降级状态（深红体积光）。 */
+            fallback 值对应夜间模式降级状态（深红体积光）。
+
+            三层叠加策略（A 方案）：
+              · 核心层（12px）：高亮热点，主导视觉亮度
+              · 中层（38px）：散射光晕，不透明度约核心的 1/3，承上启下
+              · 外层（75px）：极淡边缘晕，让光斑自然化开而非硬截断
+            三层共享圆心，不透明度呈指数递减，视觉上感知为单一光斑而非套圈。
+            filter: blur(2px) 进一步柔化最外层边缘的像素锯齿。
+
+            mix-blend-mode: screen（C 方案）：
+              光斑与下层玻璃底色做屏幕混合，产生"光透过玻璃"效果，
+              而非"光贴在玻璃表面"的平面叠加感。
+              日间模式切换为 soft-light，避免 screen 在浅色背景下过曝。 */
       .menu-layer-light {
          z-index: 8;
-         background: radial-gradient(75px circle at var(--lx, -9999px) var(--ly, -9999px),
-               rgba(var(--volume-light, 180, 0, 0), 0.055) 0%,
-               rgba(var(--volume-light, 180, 0, 0), 0.03) 30%,
-               rgba(var(--volume-light, 180, 0, 0), 0.008) 60%,
-               rgba(var(--volume-light, 180, 0, 0), 0) 85%,
+         mix-blend-mode: screen;
+         filter: blur(2px);
+         background:
+            /* 核心热点：小半径，高不透明度，主导光斑视觉重心 */
+            radial-gradient(12px circle at var(--lx, -9999px) var(--ly, -9999px),
+               rgba(var(--volume-light, 180, 0, 0), 0.13) 0%,
+               rgba(var(--volume-light, 180, 0, 0), 0.06) 60%,
+               transparent 100%),
+            /* 中层散射：中半径，不透明度约核心 1/3，承接核心向外过渡 */
+            radial-gradient(38px circle at var(--lx, -9999px) var(--ly, -9999px),
+               rgba(var(--volume-light, 180, 0, 0), 0.045) 0%,
+               rgba(var(--volume-light, 180, 0, 0), 0.018) 55%,
+               transparent 100%),
+            /* 外层晕：大半径，极低不透明度，柔化光斑边缘截断感 */
+            radial-gradient(75px circle at var(--lx, -9999px) var(--ly, -9999px),
+               rgba(var(--volume-light, 180, 0, 0), 0.016) 0%,
+               rgba(var(--volume-light, 180, 0, 0), 0.005) 50%,
                transparent 100%);
+      }
+
+      body.light-mode .menu-layer-light {
+         /* 日间：screen 在浅色背景下会过曝，改用 soft-light 保持层次感 */
+         mix-blend-mode: soft-light;
       }
 
       /* 第3层（z-index:9）：过渡层，纯色半透明，不使用 backdrop-filter */
@@ -1705,11 +1734,6 @@
             });
           }
 
-          // alwaysOn 元素（menuToggle）在菜单打开时隐藏，只需在状态切换时清除一次，
-          //     而非每次 pointermove 都重复写入 -9999px。用标志位追踪上一帧的菜单状态。
-          //     声明必须位于 clearAllReveal 之前，避免函数体内赋值触发 TDZ 隐患。
-          let _prevMenuActive = false;
-
           function clearAllReveal() {
             targets.forEach(({ el }) => clearRevealVar(el));
             // 光照光层：重置全屏坐标，防止菜单关闭后光斑残留
@@ -1724,6 +1748,10 @@
             cachedTargetRects = null;
           }
 
+          // alwaysOn 元素（menuToggle）在菜单打开时隐藏，只需在状态切换时清除一次，
+          //     而非每次 pointermove 都重复写入 -9999px。用标志位追踪上一帧的菜单状态。
+          let _prevMenuActive = false;
+
           function handleMove(e) {
             if (e.pointerType && e.pointerType !== 'mouse') return;
             state.lastMouseX = e.clientX;
@@ -1732,9 +1760,7 @@
 
             // CSS 变量更新：不涉及绘制，直接同步执行（开销很低）
             // 使用缓存 rect，避免每次 pointermove 对 fixed 元素重复 reflow
-            // _animating 期间 cachedTargetRects 被有意置为 null（resizeCanvas 内），
-            //     此时菜单尺寸仍在变换中，rect 无效，跳过重建以防坐标错误。
-            //     animationend 回调会在动画结束后统一重建缓存，光效恢复响应。
+            // 动画期间 cachedTargetRects 为 null，rect 此时无效，跳过重建
             if (!cachedTargetRects && !_animating) refreshTargetRects();
             targets.forEach(({ el, range, alwaysOn, distFn }) => {
               if (!alwaysOn && !menuActive) { clearRevealVar(el); return; }
@@ -1743,9 +1769,6 @@
                 if (!_prevMenuActive) clearRevealVar(el);
                 return;
               }
-              // _animating 期间 cachedTargetRects 为 null（见上方注释），跳过本帧更新。
-              // 不降级到实时 getBoundingClientRect——动画中的 rect 值本身就不可靠。
-              if (!cachedTargetRects) return;
               // 统一从缓存读取 rect；缓存缺失时降级到实时查询（防御性回退）
               const rect = cachedTargetRects.get(el) ?? el.getBoundingClientRect();
               updateRevealVar(el, e.clientX, e.clientY, range, distFn, rect);
@@ -2175,25 +2198,15 @@
           // active class 同时充当防重入检查：菜单已打开时直接跳出
           if (sideMenuWrapper.classList.contains('active')) return;
           state.isWheelScrolling = false;        // 防御：关/开菜单之间若 debounce 尚未触发，复位屏蔽标志
-
-          // Mica 采样必须在 menuMask 激活之前、resizeCanvas() 之前执行：
-          //   · menuMask 激活后 elementFromPoint 命中遮罩（rgba(0,0,0,0.3)），采样结果变为纯黑。
-          //   · resizeCanvas() 内 updateColorCache() 读取 CSS 变量；若 Mica 尚未写入，颜色缓存将
-          //     持有旧值，导致本次打开期间光照光颜色错误。
-          // ⚠️ 风险提示：sampleIfNeeded 的 then() 回调为微任务，在当前同步块执行完毕后才运行。
-          //     sampleIfNeeded 内部采样全程同步（无真正 I/O），CSS 变量写入在 then() 触发前已完成，
-          //     故 resizeCanvas() 读到的必然是最新 Mica 颜色。
-          //     若未来 sampleIfNeeded 内部引入真正的异步操作（如 fetch），需在 openMenu 调用前预热，
-          //     否则菜单会短暂显示旧颜色。
+          // Mica 采样必须在 menuMask 激活之前执行：
+          // menuMask 是全屏 fixed 覆盖层（pointer-events: auto），激活后 elementFromPoint
+          // 的所有采样点均命中 menuMask（background: rgba(0,0,0,0.3)），导致采到纯黑色。
+          // sample() 内部无 await，DOM 查询全程同步，此处调用不阻塞后续菜单显示。
           micaSampler.sampleIfNeeded().then(() => {
-            // 双重检查：用户可能在采样微任务排队期间关闭了菜单
-            if (!sideMenuWrapper.classList.contains('active')) return;
-            if (isDesktop && reveal) {
-              reveal.resizeCanvas();         // Mica 新颜色已写入，updateColorCache() 读到最新值
-              reveal.attachScrollListener();
+            if (isDesktop && reveal && sideMenuWrapper.classList.contains('active')) {
+              reveal.resizeCanvas();   // 用 Mica 新颜色更新颜色缓存
             }
           });
-
           sideMenuWrapper.classList.add('active');
           sideMenu.classList.add('active');
           menuMask.classList.add('active');
@@ -2201,8 +2214,12 @@
           // 质感层：按需重建（滚动后 _dirty=true 时才重新生成 SVG）
           texturePainter.paintIfNeeded();
           // TODO(入场动画)：实现爆炸入场动画时，需 await syncToMenu() 完成后再触发；
-          //                  届时将 openMenu 改为 async 并在此处 await。
+          //                  届时将 openMenu 恢复为 async 并在此处 await。
           highlighter.syncToMenu();
+          if (isDesktop && reveal) {
+            reveal.resizeCanvas();
+            reveal.attachScrollListener();
+          }
         }
 
         function closeMenu() {
