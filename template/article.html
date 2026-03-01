@@ -1465,29 +1465,32 @@
             chapterListEl.addEventListener('touchcancel', onTouchEnd);
 
             if (isDesktop) {
-              // 事件委托：pointerover/pointerout 会冒泡，pointerenter/pointerleave 不冒泡。
-              // pointerover：仅在进入新 item 且没有程序驱动滚动时触发
-              chapterListEl.addEventListener('pointerover', (e) => {
-                if (e.pointerType !== 'mouse') return;
+              // 事件委托：over/out 会冒泡，enter/leave 不冒泡。
+              // 同时监听 pointer* 和 mouse* 两套事件，兼容 WebView 外接鼠标只派发 mouse* 的场景。
+              const onOver = (e) => {
+                if (e.pointerType && e.pointerType !== 'mouse') return;
                 if (state.isWheelScrolling || state.isHoverScrolling) return;
                 const item = e.target.closest('.chapter-item');
                 if (item && item !== state.hoveredItem) onItemPointerEnter(item);
-              });
-
-              // pointerout：relatedTarget 不在当前 item 内部、且没有程序驱动滚动时触发
-              chapterListEl.addEventListener('pointerout', (e) => {
-                if (e.pointerType !== 'mouse') return;
+              };
+              const onOut = (e) => {
+                if (e.pointerType && e.pointerType !== 'mouse') return;
                 if (state.isWheelScrolling || state.isHoverScrolling) return;
                 const item = e.target.closest('.chapter-item');
                 if (item && !item.contains(e.relatedTarget)) onItemPointerLeave();
-              });
-
-              // pointerleave（整个列表）：isWheelScrolling/isHoverScrolling 期间屏蔽
-              chapterListEl.addEventListener('pointerleave', (e) => {
-                if (e.pointerType !== 'mouse') return;
+              };
+              const onLeave = (e) => {
+                if (e.pointerType && e.pointerType !== 'mouse') return;
                 if (state.isWheelScrolling || state.isHoverScrolling) return;
                 if (state.activeState === 'hover') onItemPointerLeave();
-              });
+              };
+
+              chapterListEl.addEventListener('pointerover',  onOver);
+              chapterListEl.addEventListener('mouseover',    onOver);
+              chapterListEl.addEventListener('pointerout',   onOut);
+              chapterListEl.addEventListener('mouseout',     onOut);
+              chapterListEl.addEventListener('pointerleave', onLeave);
+              chapterListEl.addEventListener('mouseleave',   onLeave);
             }
           }
 
@@ -1770,8 +1773,10 @@
           }
 
           document.addEventListener('pointermove',  handleMove);
+          document.addEventListener('mousemove',    handleMove);
           document.addEventListener('pointerup',    handleMove);
           document.addEventListener('pointerleave', clearAllReveal);
+          document.addEventListener('mouseleave',   clearAllReveal);
           window.addEventListener('blur',           clearAllReveal);
 
           function handleResize() {
