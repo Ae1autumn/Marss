@@ -1218,12 +1218,14 @@
                 driveArticleScroll(centerId, () => {
                   clearWheelLock();
                   if (state.activeState === 'menu' && !state.hoveredItem) {
+                    menuSyncDebounce.cancel();  // 取消残余 scroll 事件可能触发的 menuSyncDebounce，防止菜单跳回旧位置
                     state.activeState = 'scroll';
                     setHighlight(state.currentId);
                   }
                 });
               } else {
                 clearWheelLock();
+                menuSyncDebounce.cancel();
                 state.activeState = 'scroll';
                 setHighlight(state.currentId);
               }
